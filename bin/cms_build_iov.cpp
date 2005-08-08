@@ -156,9 +156,7 @@ int main(int argc, char** argv) {
     mycatalog->start();
     pool::FileCatalog::FileID fid;
     std::string ftype;
-    std::cout<<1<<std::endl;
     l.lookupFileByPFN(myuri,fid,ftype);
-    std::cout<<2<<std::endl;
     if(fid.empty()){
       std::cerr<<"Error: "<<myuri<<" is not registered in the catalog "<<cat<<std::endl;
       exit(-1);
@@ -166,14 +164,11 @@ int main(int argc, char** argv) {
       std::cerr<<"Error: "<<myuri<<" is registered in the catalog "<<cat<<" but has the wrong storage type: "<<ftype<<std::endl;
       exit(-1);
     }
-    std::cout<<3<<std::endl;
     mycatalog->commit();  
     mycatalog->disconnect();
-    std::cout<<4<<std::endl;
     //create IOV object
     cond::IOV* myIov=new cond::IOV;
     //prepare tokenBuilder
-    std::cout<<5<<std::endl;
     cond::TokenBuilder tk;
     tk.setDB(fid);
     if(!classId.empty()){ //classId has precedence over dict
@@ -181,34 +176,27 @@ int main(int argc, char** argv) {
     }else{
       tk.setContainerFromDict(dictName,className,contName);
     }
-    std::cout<<6<<std::endl;
     //prepare RAL queries
     seal::IHandle<pool::IRelationalService> serviceHandle = pool::POOLContext::context()->query<pool::IRelationalService>( "POOL/Services/RelationalService" );
     if ( ! serviceHandle ) {
       throw std::runtime_error( "Could not retrieve the relational service" );
     }
     pool::IRelationalDomain& domain = serviceHandle->domainForConnection(myuri);
-    std::cout<<7<<myuri<<std::endl;
     // Creating a session
     std::auto_ptr<pool::IRelationalSession> session(domain.newSession(myuri));
-    std::cout<<7.7<<session.get()<<std::endl;
-    std::cout<<"userName "<<userName<<std::endl;
-    std::cout<<"password "<<password<<std::endl;
+    //std::cout<<"userName "<<userName<<std::endl;
+    //std::cout<<"password "<<password<<std::endl;
     //session->connectAsUser(userName, password);
     if ( ! session->connect() ) {
-      std::cout<<"here"<<std::endl;
       throw std::runtime_error( "Could not connect to the database server." );
     }
-    std::cout<<7.8<<std::endl;
     // Start a transaction
     if ( ! session->transaction().start() ) {
       throw std::runtime_error( "Could not start a new transaction." );
     }
-    std::cout<<7.9<<std::endl;
     pool::IRelationalTable& table=session->userSchema().tableHandle(tabName);
-    std::cout<< "Querying : SELECT IOV_VALUE_ID, TILLTIME FROM "<<tabName<<std::endl;
+    //std::cout<< "Querying : SELECT IOV_VALUE_ID, TILLTIME FROM "<<tabName<<std::endl;
     std::auto_ptr< pool::IRelationalQuery > query1( table.createQuery() );
-    std::cout<<8<<std::endl;
     query1->setRowCacheSize( 10 );
     query1->addToOutputList( "IOV_VALUE_ID" );
     query1->addToOutputList( "TILLTIME" );
@@ -223,13 +211,10 @@ int main(int argc, char** argv) {
 	long mytime;
 	row["TILLTIME"].getValue<long>(mytime);//the column name should be in DBCommon
 	// build payload token
-	std::cout<<"myl"<<myl<<std::endl;
-	std::cout<<"mytime"<<mytime<<std::endl;
 	myIov->iov[mytime]=tk.tokenAsString();
       }
     }
     //writing iov out
-    std::cout<<"about to write"<<std::endl;
     cond::DBWriter dbwriter(myuri);
     dbwriter.openContainer("IOV"); //iov container name should be in DBCommon
     dbwriter.startTransaction();
