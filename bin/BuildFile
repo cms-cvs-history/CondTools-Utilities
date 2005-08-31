@@ -1,5 +1,7 @@
+<use name=FWCore/Framework>
 <use name=CondCore/DBCommon>
 <use name=CondCore/IOVService>
 <use name=CondCore/MetaDataService>	
-<bin file=cms_build_iov.cpp name=cms_build_iov></bin>
-<bin file=cms_build_condmetadata.cpp name=cms_build_condmetadata></bin>
+<bin file=cmscond_build_iov.cpp name=cmscond_build_iov></bin>
+<bin file=cmscond_build_metadata.cpp name=cmscond_build_metadata></bin>
+
