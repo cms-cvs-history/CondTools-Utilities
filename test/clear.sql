@@ -13,8 +13,8 @@ drop table POOL_CONT___LINKS;
 drop table POOL_CONT___PARAMS;
 
 -- Tables created from the object-relational mapping
-drop table ECALPEDESTALS_VALUES;
+drop table ECALPEDESTALS_VALUE;
 drop table ECALPEDESTALS;
-drop table COND__IOV;
 drop table COND__IOV_IOV;
+drop table COND__IOV;
 drop table METADATA;
