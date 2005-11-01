@@ -21,10 +21,10 @@ void printUsage(){
 }
 
 int main(int argc, char** argv) {
-  std::string dum1="POOL_AUTH_USER=cms_xiezhen_dev";
-  std::string dum2="POOL_AUTH_PASSWORD=xiezhen123";
-  ::putenv( const_cast<char*>(dum1.c_str()));
-  ::putenv( const_cast<char*>(dum2.c_str()));
+//   std::string dum1="POOL_AUTH_USER=cms_xiezhen_dev";
+//   std::string dum2="POOL_AUTH_PASSWORD=xiezhen123";
+//   ::putenv( const_cast<char*>(dum1.c_str()));
+//   ::putenv( const_cast<char*>(dum2.c_str()));
   seal::PluginManager::get()->initialise();
   pool::POOLContext::loadComponent( "SEAL/Services/MessageService" );
   pool::POOLContext::loadComponent( "POOL/Services/EnvironmentAuthenticationService" );
