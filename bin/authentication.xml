@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<connectionlist>
+
+<connection name="oracle://cms_val_lb.cern.ch/CMS_VAL_GENERAL_POOL_OWNER">
+  <parameter name="user" value="CMS_VAL_GENERAL_POOL_OWNER" />
+  <parameter name="password" value="val_gen_own_1031" />
+</connection>
+
+</connectionlist>
