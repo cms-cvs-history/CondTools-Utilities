@@ -21,16 +21,16 @@ cms_val_lb.cern.ch =
      )
 )
 EOI
-export MY_TNS_ADMIN=${THISDIR}
 ##################user defined parameters#################################
 export SCRAM_ARCH=slc3_ia32_gcc323
-CMSSWVERSION=CMSSW_0_2_0_pre7
+CMSSWVERSION=CMSSW_0_2_0_pre5
 OWNER=ECAL
 MYAPP=OfflinePedWriter  #your writer application name
 ##################set up catalog and connection############################
 cd ${CMSSWVERSION}/src
 eval `scramv1 runtime -sh`
-export TNS_ADMIN=${MY_TNS_ADMIN}
+cd ${THISDIR}
+export TNS_ADMIN=${THISDIR}
 export POOL_AUTH_USER=CMS_VAL_GENERAL_POOL_OWNER
 export POOL_AUTH_PASSWORD=val_gen_own_1031
 rm -f conddbcatalog.xml
@@ -48,4 +48,4 @@ echo "Running ${MYAPP}"
 export CONNECT=oracle://cms_val_lb.cern.ch/${POOL_AUTH_USER}
 export TAG=ecalfall_test      #tag
 echo "Using TNS_ADMIN ${TNS_ADMIN}"
-../test/${SCRAM_ARCH}/${MYAPP} ${CONNECT} 10 ${TAG}
+${CMSSWVERSION}/test/${SCRAM_ARCH}/${MYAPP} ${CONNECT} 10 ${TAG}
