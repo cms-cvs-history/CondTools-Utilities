@@ -16,8 +16,8 @@ class create_default_mapping:
        self.parsecmdln()
       
     def buildnames(self):
-       self.outmapname = self.objectname+'-default.xml'
-       self.outsetupname = self.objectname+'-setup.xml'
+       self.outmapname = '-'.join([self.objectname,'mapping',self.mappingversion+'.xml'])
+       self.outsetupname = '-'.join([self.objectname,'setup',self.mappingversion+'.xml'])
 
     def parsecmdln(self):
        usage = "usage: \%prog [-o|-v|-h] objectName dictionaryName"
@@ -31,8 +31,10 @@ class create_default_mapping:
        self.objectname=args[0]
        self.dictname=args[1]
        self.buildnames()
-       if self.parser.values.verbose : print self.objectname
-       if self.parser.values.verbose : print self.dictname
+       if self.parser.values.verbose : print 'Object: ', self.objectname
+       if self.parser.values.verbose : print 'Dictionary: ', self.dictname
+       if self.parser.values.verbose : print 'OutputMapping: ', self.outmapname
+       if self.parser.values.verbose : print 'OutputSetup: ', self.outsetupname
 
     def process(self):
        self.buildtemplate()
