@@ -8,7 +8,6 @@ class create_default_mapping:
        self.objectname = 'Pedestals'      
        self.dictname = 'CondFormatsCalibration'
        self.outmapname = ''
-       self.outsetupname = ''
        self.mappingversion = 'cmsdefault'
        self.templatename = 'mapping-template.xml'
        self.dummyname = 'foo.db'
@@ -17,7 +16,6 @@ class create_default_mapping:
       
     def buildnames(self):
        self.outmapname = '-'.join([self.objectname,'mapping',self.mappingversion+'.xml'])
-       self.outsetupname = '-'.join([self.objectname,'setup',self.mappingversion+'.xml'])
 
     def parsecmdln(self):
        usage = "usage: \%prog [-o|-v|-h] objectName dictionaryName"
@@ -34,13 +32,10 @@ class create_default_mapping:
        if self.parser.values.verbose : print 'Object: ', self.objectname
        if self.parser.values.verbose : print 'Dictionary: ', self.dictname
        if self.parser.values.verbose : print 'OutputMapping: ', self.outmapname
-       if self.parser.values.verbose : print 'OutputSetup: ', self.outsetupname
 
     def process(self):
        self.buildtemplate()
        self.dumpdefaultmapping()
-       self.buildcmsdefaultmapping()
-       self.buildsetup()
 
     def buildtemplate(self):
        f=open(os.path.join(self.outdir,self.templatename), 'w')
@@ -58,24 +53,6 @@ class create_default_mapping:
        mycmd=' '.join(['pool_build_object_relational_mapping',' -f', os.path.join(self.outdir,self.templatename), '-o', os.path.join(self.outdir,self.outmapname), '-b', '-d', self.dictname ,'-c','sqlite_file:'+os.path.join(self.outdir,self.dummyname) ])
        if self.parser.values.verbose : print mycmd
        os.system(mycmd)
-
-    def buildcmsdefaultmapping(self):
-       pass
-       #f=open(os.path.join(self.outdir,self.outmapname), 'w') 
-       #f.close()
-
-    def buildsetup(self):
-       f=open(os.path.join(self.outdir,self.outsetupname), 'w') 
-       f.write("<?xml version='1.0' encoding=\"UTF-8\"?>\n")
-       f.write("<!DOCTYPE Database SYSTEM \"InMemory\">\n")
-       f.write("<Database connectionString=\"notmatter\" >\n")
-       myline='<HomogeneousContainer name=\"'+self.objectname+'\" >\n'
-       f.write(myline)
-       myline='<Class name=\"'+self.objectname+'\" mappingVersion=\"'+self.mappingversion+'\"/>)\n'
-       f.write(myline)
-       f.write("</HomogeneousContainer >\n")
-       f.write("</Database >")
-       f.close()
 
     def cleanup(self):
        if os.path.exists(os.path.join(self.outdir,self.dummyname)): 
