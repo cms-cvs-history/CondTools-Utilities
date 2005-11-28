@@ -1,0 +1,33 @@
+project CMSSW
+setenv SCRAM_ARCH slc3_ia32_gcc323
+scramv1 p CMSSW CMSSW_[VERSION]
+cd CMSSW_[VERSION]/src
+cvs co CondTools
+cd src/CondTools/Utilities/bin
+eval `scramv1 runtime -csh`
+
+Rules:
+----the name of the mapping file has the following format:
+     [ObjectName]-mapping-[mappingversion].xml
+
+1) build default mapping for the desired class with the default mapping version set to "cmsdefault". Note: this is an one time operation. Use -u option to see the help message
+e.g.
+./create_default_mapping EcalPedestals CondFormats/EcalObjects
+will create the default mapping xml for object EcalPedestals with the name
+EcalPedestals-mapping-cmsdefault.xml
+
+1.5) cp the output xml file from step 1) to EcalPedestals-mapping-1.0.xml
+modify EcalPedestals-custom.xml
+   --change to the Mapping version tag to "1.0"(!)
+   --change column names and table names as you wish
+
+2) setup the offline POOL database using command setup_pool_database. Use -u option to see the help message
+ Note: this has to be run each time new data are transfered to offline
+
+3) get transfered data in offline db from eventsetup. Inspect the content of load_onlineped.txt, see data changes when iov expires.
+
+cmsRun --parameter-set load_onlineped.txt
+
+Other commandline tools:
+ - remove_pool_tables: drop all the POOL service tables
+ 
