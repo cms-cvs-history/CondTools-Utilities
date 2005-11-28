@@ -17,7 +17,7 @@ will create the default mapping xml for object EcalPedestals with the name
 EcalPedestals-mapping-cmsdefault.xml
 
 1.5) cp the output xml file from step 1) to EcalPedestals-mapping-1.0.xml
-modify EcalPedestals-custom.xml
+modify EcalPedestals-mapping-1.0.xml
    --change to the Mapping version tag to "1.0"(!)
    --change column names and table names as you wish
 
