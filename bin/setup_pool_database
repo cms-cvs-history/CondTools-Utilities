@@ -24,7 +24,7 @@ class setup_pool_database:
        self.parsecmdln()
 
     def parsecmdln(self):
-       usage = "usage: \%prog [-t|-c|-u|-p|-o|-h|-v] objectName dictionaryName dbName inputMappingFile\n"
+       usage = "usage: \%prog [-c|-u|-p|-o|-h|-v] objectName dictionaryName dbName inputMappingFile\n"
        usage += "\n"
        usage +="arguments:\n"
        usage +="  objectName: name of object to be processed, e.g. Pedestals\n"
@@ -33,7 +33,6 @@ class setup_pool_database:
        usage +="  inputMappingFile: input mapping file with path, format: [path]/[objectName]-mapping-[mappingversion].xml, e.g. Pedestals-mapping-1.0.xml\n"
 
        self.parser = OptionParser(usage)  
-       self.parser.add_option("-t","--tag",action='store',type="string", dest="iovtag", help='iov tag name; [default] [objectName]-init' )      
        self.parser.add_option("-c","--catalog",action='store',type="string", dest="catalog", default='xmlcatalog_file://PoolFileCatalog.xml', help='Pool file catalog; [default] xmlcatalog_file://PoolFileCatalog.xml' )
        self.parser.add_option("-u","--user",action='store',type="string", dest="username", default='', help='database user or account name' ) 
        self.parser.add_option("-p","--password",action='store',type="string", dest="password", default='', help='database password' ) 
@@ -43,10 +42,6 @@ class setup_pool_database:
        (options, args) = self.parser.parse_args()
        if len(args) != 4:
           self.parser.error("incorrect number of arguments, try -h for help") 
-       if self.parser.values.iovtag:
-           self.iovtag=self.parser.values.iovtag
-       else:
-           self.iovtag='-'.join([args[0],'init'])
        self.catalog=self.parser.values.catalog
        self.username=self.parser.values.username
        self.password=self.parser.values.password
@@ -69,7 +64,7 @@ class setup_pool_database:
        self.buildsetup()
        self.buildpoolmapping()
        self.setupdb()
-
+ 
     def buildsetup(self):       
        f=open(os.path.join(self.outdir,self.setupfilename), 'w') 
        f.write("<?xml version='1.0' encoding=\"UTF-8\"?>\n")
