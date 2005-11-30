@@ -32,23 +32,18 @@
 #include <cstdlib>
 
 void printUsage(){
-  std::cout<<"usage: cms_build_iov -c -t -n [-f|-b|-d|-o|-s|-m|-h]" <<std::endl; 
+  std::cout<<"usage: cms_build_iov -c -t -n [-f|-b|-d|-o|-m|-h]" <<std::endl; 
   std::cout<<"-c contact string (mandatory)"<<std::endl;
   std::cout<<"-t tablename (mandatory)"<<std::endl;
   std::cout<<"-n classname (payload class name, mandatory)"<<std::endl;
   std::cout<<"-m containername(optional, default to classname)"<<std::endl;
   std::cout<<"-f file catalog contact string (optional)"<<std::endl;
   std::cout<<"-b build infinit iov (default mode: if TIME not found in the object table, assume infinit iov)"<<std::endl;
-  std::cout<<"-d dictionary name (optional, no need if -b or -n )"<<std::endl;
-  std::cout<<"-s classid(optional)"<<std::endl;
+  std::cout<<"-d dictionary name (mandatory)"<<std::endl;
   std::cout<<" -h print help message" <<std::endl;
 }
 
 int main(int argc, char** argv) {
-  //std::string dum1="POOL_AUTH_USER=cms_xiezhen_dev";
-  //std::string dum2="POOL_AUTH_PASSWORD=xiezhen123";
-  //::putenv( const_cast<char*>(dum1.c_str()));
-  //::putenv( const_cast<char*>(dum2.c_str()));
   seal::PluginManager::get()->initialise();
   pool::POOLContext::loadComponent( "SEAL/Services/MessageService" );
   pool::POOLContext::loadComponent( "POOL/Services/RelationalService" );
@@ -70,7 +65,7 @@ int main(int argc, char** argv) {
     mesgsvc->setOutputStream( std::cerr, seal::Msg::Error );
     mesgsvc->setOutputStream( std::cerr, seal::Msg::Warning );
   } 
-  std::string  myuri, tabName, className, contName, cat, dictName, classId, userName, password;
+  std::string  myuri, tabName, className, contName, cat, dictName, userName, password;
   bool infiov=false;
   try{
     cond::CommandLine commands(argc,argv);
@@ -114,16 +109,13 @@ int main(int argc, char** argv) {
     if( commands.Exists("d") ){
       dictName=commands.GetByName("d");
     }
-    if( commands.Exists("s") ){
-      classId=commands.GetByName("s");
-    }
   }catch(std::string& strError){
     std::cerr<< "Error: command parsing error "<<strError<<std::endl;
     exit(-1);
   }
   
-  if(classId.empty()&&dictName.empty()){
-    std::cerr<< "Error: must specify either classId(-s) or dictionary name(-d)" <<std::endl;
+  if(dictName.empty()){
+    std::cerr<< "Error: must specify dictionary name(-d)" <<std::endl;
     exit(-1);
   }
   //must be load after the env is set
@@ -157,12 +149,7 @@ int main(int argc, char** argv) {
     cond::IOV* myIov=new cond::IOV;
     //prepare tokenBuilder
     cond::TokenBuilder tk;
-    tk.setDB(fid);
-    if(!classId.empty()){ //classId has precedence over dict
-      tk.setContainer(classId,contName);
-    }else{
-      tk.setContainerFromDict(dictName,className,contName);
-    }
+    tk.set(fid, dictName, className, contName );
     //prepare RAL queries
     seal::IHandle<pool::IRelationalService> serviceHandle = pool::POOLContext::context()->query<pool::IRelationalService>( "POOL/Services/RelationalService" );
     if ( ! serviceHandle ) {
@@ -193,7 +180,7 @@ int main(int argc, char** argv) {
 	const pool::AttributeList& row = cursor1.currentRow();
 	long myl;
 	row["IOV_VALUE_ID"].getValue<long>(myl);//the column name should be in DBCommon
-	tk.setOID(myl);
+	tk.resetOID(myl);
 	if(!infiov){
 	  long mytime;
 	  row["TIME"].getValue<long>(mytime);//the column name should be in DBCommon
@@ -214,9 +201,7 @@ int main(int argc, char** argv) {
     cond::DBWriter dbwriter(myuri);
     dbwriter.startTransaction();
     std::string iovtoken=dbwriter.write<cond::IOV>(myIov, "IOV");
-    std::cout<<"about to commit writer"<<std::endl;
     dbwriter.commitTransaction();
-    std::cout<<"committed writer"<<std::endl;
     std::cout<<iovtoken<<std::endl;//print result to std::cout
     return 0;
   }catch ( pool::RelationalException& re ) {
