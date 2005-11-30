@@ -1,4 +1,5 @@
 #include "CondCore/DBCommon/interface/CommandLine.h"
+#include "CondCore/MetaDataService/interface/MetaData.h"
 #include "CondCore/DBCommon/interface/TokenBuilder.h"
 #include "CondCore/DBCommon/interface/DBWriter.h"
 #include "CondCore/IOVService/interface/IOV.h"
@@ -32,9 +33,10 @@
 #include <cstdlib>
 
 void printUsage(){
-  std::cout<<"usage: cms_build_iov -c -t -n [-f|-b|-d|-o|-m|-h]" <<std::endl; 
+  std::cout<<"usage: cms_build_iov -c -t -T -n [-f|-b|-d|-o|-m|-h]" <<std::endl; 
   std::cout<<"-c contact string (mandatory)"<<std::endl;
   std::cout<<"-t tablename (mandatory)"<<std::endl;
+  std::cout<<"-T tagname (mandatory)"<<std::endl;
   std::cout<<"-n classname (payload class name, mandatory)"<<std::endl;
   std::cout<<"-m containername(optional, default to classname)"<<std::endl;
   std::cout<<"-f file catalog contact string (optional)"<<std::endl;
@@ -65,7 +67,7 @@ int main(int argc, char** argv) {
     mesgsvc->setOutputStream( std::cerr, seal::Msg::Error );
     mesgsvc->setOutputStream( std::cerr, seal::Msg::Warning );
   } 
-  std::string  myuri, tabName, className, contName, cat, dictName, userName, password;
+  std::string  myuri, tabName, className, contName, cat, dictName, userName, password, mytag;
   bool infiov=false;
   try{
     cond::CommandLine commands(argc,argv);
@@ -84,6 +86,9 @@ int main(int argc, char** argv) {
     }else{
       std::cerr<<"Error: must specify table name(-t)"<<std::endl;
       exit(-1);
+    }
+    if( commands.Exists("T") ){
+      mytag=commands.GetByName("T");
     }
     if( commands.Exists("n") ){
       className=commands.GetByName("n");
@@ -202,8 +207,13 @@ int main(int argc, char** argv) {
     dbwriter.startTransaction();
     std::string iovtoken=dbwriter.write<cond::IOV>(myIov, "IOV");
     dbwriter.commitTransaction();
-    std::cout<<iovtoken<<std::endl;//print result to std::cout
-    return 0;
+    std::cout<<mytag<<" "<<iovtoken<<std::endl;//print result to std::cout
+    cond::MetaData meta(myuri);
+    bool result=meta.addMapping(mytag, iovtoken);
+    if(!result){
+      std::cerr<< "Error: failed to tag token "<<iovtoken<<std::endl;
+      exit(-1);
+    }
   }catch ( pool::RelationalException& re ) {
     std::cerr << "Relational exception from " << re.flavorName() << "    " << re.what() << std::endl;
     if (re.code().isError()){
