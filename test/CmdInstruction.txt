@@ -38,4 +38,4 @@ e.g.
  
 Other commandline tools:
  - remove_pool_tables: drop all the POOL service tables
- 
+ - remove_mapping: remove all the entries in the pool service tables of given mapping version.
