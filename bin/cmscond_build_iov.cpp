@@ -4,6 +4,7 @@
 #include "CondCore/DBCommon/interface/DBWriter.h"
 #include "CondCore/IOVService/interface/IOV.h"
 #include "FWCore/Framework/interface/IOVSyncValue.h"
+#include "FWCore/Utilities/interface/Exception.h"
 #include "FileCatalog/IFileCatalog.h"
 #include "FileCatalog/URIParser.h"
 #include "FileCatalog/IFCAction.h"
@@ -224,8 +225,8 @@ int main(int argc, char** argv) {
     if (er.code().isError()){
       exit(er.code().code());
     }
-  }catch( std::exception& e ) {
-    std::cerr << "std exception "<<e.what() << std::endl;
+  }catch( cms::Exception& e ) {
+    std::cerr << "cms exception "<<e.what() << std::endl;
     exit(-1);
   }catch( ... ) {
     std::cerr << "Funny error" << std::endl;
