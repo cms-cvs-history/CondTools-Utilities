@@ -1,0 +1,31 @@
+<?xml version="1.0" ?>
+<connectionlist>
+<connection name="oracle://cms_val_lb.cern.ch/CMS_VAL_GENERAL_POOL_OWNER">
+  <parameter name="user" value="CMS_VAL_GENERAL_POOL_READER" />
+  <parameter name="password" value="val_gen_rea_1031" />
+</connection>
+<connection name="oracle://cms_val_lb.cern.ch/CMS_VAL_ECAL_POOL_OWNER">
+  <parameter name="user" value="CMS_VAL_GENERAL_POOL_READER" />
+  <parameter name="password" value="val_gen_rea_1031" />
+</connection>
+<connection name="oracle://cms_val_lb.cern.ch/CMS_VAL_CSC_POOL_OWNER">
+  <parameter name="user" value="CMS_VAL_GENERAL_POOL_READER" />
+  <parameter name="password" value="val_gen_rea_1031" />
+</connection>
+<connection name="oracle://cms_val_lb.cern.ch/CMS_VAL_DT_POOL_OWNER">
+  <parameter name="user" value="CMS_VAL_GENERAL_POOL_READER" />
+  <parameter name="password" value="val_gen_rea_1031" />
+</connection>
+<connection name="oracle://cms_val_lb.cern.ch/CMS_VAL_HCAL_POOL_OWNER">
+  <parameter name="user" value="CMS_VAL_GENERAL_POOL_READER" />
+  <parameter name="password" value="val_gen_rea_1031" />
+</connection>
+<connection name="oracle://cms_val_lb.cern.ch/CMS_VAL_STRIP_POOL_OWNER">
+  <parameter name="user" value="CMS_VAL_GENERAL_POOL_READER" />
+  <parameter name="password" value="val_gen_rea_1031" />
+</connection>
+<connection name="oracle://cms_val_lb.cern.ch/CMS_VAL_PIXEL_POOL_OWNER">
+  <parameter name="user" value="CMS_VAL_GENERAL_POOL_READER" />
+  <parameter name="password" value="val_gen_rea_1031" />
+</connection>
+</connectionlist>

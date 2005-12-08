@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<!-- Edited By POOL -->
+<!DOCTYPE POOLFILECATALOG SYSTEM "InMemory">
+<POOLFILECATALOG>
+
+  <File ID="9C4359DD-4450-DA11-9076-0008743F7CC7">
+    <physical>
+      <pfn filetype="POOL_RDBMS" name="oracle://cms_val_lb.cern.ch/CMS_VAL_GENERAL_POOL_OWNER"/>
+    </physical>
+    <logical/>
+  </File>
+
+  <File ID="78D917DF-4450-DA11-99FD-0008743F7CC7">
+    <physical>
+      <pfn filetype="POOL_RDBMS" name="oracle://cms_val_lb.cern.ch/CMS_VAL_STRIP_POOL_OWNER"/>
+    </physical>
+    <logical/>
+  </File>
+
+  <File ID="708BEEE0-4450-DA11-97A9-0008743F7CC7">
+    <physical>
+      <pfn filetype="POOL_RDBMS" name="oracle://cms_val_lb.cern.ch/CMS_VAL_RPC_POOL_OWNER"/>
+    </physical>
+    <logical/>
+  </File>
+
+  <File ID="3AF8ABDD-4450-DA11-8390-0008743F7CC7">
+    <physical>
+      <pfn filetype="POOL_RDBMS" name="oracle://cms_val_lb.cern.ch/CMS_VAL_ECAL_POOL_OWNER"/>
+    </physical>
+    <logical/>
+  </File>
+
+  <File ID="80AFF9DD-4450-DA11-927D-0008743F7CC7">
+    <physical>
+      <pfn filetype="POOL_RDBMS" name="oracle://cms_val_lb.cern.ch/CMS_VAL_HCAL_POOL_OWNER"/>
+    </physical>
+    <logical/>
+  </File>
+
+  <File ID="54A45DDE-4450-DA11-955E-0008743F7CC7">
+    <physical>
+      <pfn filetype="POOL_RDBMS" name="oracle://cms_val_lb.cern.ch/CMS_VAL_CSC_POOL_OWNER"/>
+    </physical>
+    <logical/>
+  </File>
+
+  <File ID="CC8DA6DE-4450-DA11-88F9-0008743F7CC7">
+    <physical>
+      <pfn filetype="POOL_RDBMS" name="oracle://cms_val_lb.cern.ch/CMS_VAL_DT_POOL_OWNER"/>
+    </physical>
+    <logical/>
+  </File>
+
+  <File ID="64AA36E0-4450-DA11-9B7E-0008743F7CC7">
+    <physical>
+      <pfn filetype="POOL_RDBMS" name="oracle://cms_val_lb.cern.ch/CMS_VAL_PIXEL_POOL_OWNER"/>
+    </physical>
+    <logical/>
+  </File>
+
+  <File ID="BE0784E0-4450-DA11-85EF-0008743F7CC7">
+    <physical>
+      <pfn filetype="POOL_RDBMS" name="oracle://cms_val_lb.cern.ch/CMS_VAL_PRESH_POOL_OWNER"/>
+    </physical>
+    <logical/>
+  </File>
+
+</POOLFILECATALOG>
