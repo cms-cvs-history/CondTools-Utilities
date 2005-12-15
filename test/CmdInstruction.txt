@@ -12,7 +12,7 @@ Rules:
 
 1) build default mapping for the desired class with the default mapping version set to "cmsdefault". Note: this is an one time operation. Use -u option to see the help message
 e.g.
-./create_default_mapping EcalPedestals CondFormats/EcalObjects
+./create_default_mapping EcalPedestals CondFormatsEcalObjects
 will create the default mapping xml for object EcalPedestals with the name
 EcalPedestals-mapping-cmsdefault.xml
 
