@@ -1,47 +1,47 @@
-#include "CondCore/DBCommon/interface/CommandLine.h"
 #include "PluginManager/PluginManager.h"
-#include "POOLCore/POOLContext.h"
-#include "POOLCore/PoolMessageStream.h"
+#include "SealKernel/ComponentLoader.h"
 #include "SealKernel/Context.h"
 #include "SealKernel/Service.h"
 #include "SealKernel/MessageStream.h"
 #include "SealKernel/Exception.h"
-#include "RelationalAccess/RelationalException.h"
 #include "RelationalAccess/IRelationalService.h"
 #include "RelationalAccess/IRelationalDomain.h"
-#include "RelationalAccess/IRelationalSession.h"
-#include "RelationalAccess/IRelationalTransaction.h"
-#include "RelationalAccess/IRelationalSchema.h"
-#include "RelationalAccess/IRelationalTable.h"
-#include "AttributeList/AttributeList.h"
-#include "RelationalAccess/IRelationalTableDataEditor.h"
+#include "RelationalAccess/ISession.h"
+#include "RelationalAccess/ITransaction.h"
+#include "RelationalAccess/ISchema.h"
+#include "RelationalAccess/ITable.h"
+#include "CoralBase/AttributeList.h"
+#include "CoralBase/AttributeSpecification.h"
+#include "CoralBase/Attribute.h"
+#include "RelationalAccess/ITableDataEditor.h"
 #include <boost/program_options.hpp>
 #include <stdexcept>
 #include <string>
 
 int main(int argc, char** argv) {
-  seal::PluginManager::get()->initialise();
-  pool::POOLContext::loadComponent( "SEAL/Services/MessageService" );
-  pool::POOLContext::loadComponent( "POOL/Services/EnvironmentAuthenticationService" );
-  pool::POOLContext::loadComponent( "POOL/Services/RelationalService" );
-  if(!::getenv( "POOL_OUTMSG_LEVEL" )){ //if not set, default to warning
-    pool::POOLContext::setMessageVerbosityLevel(seal::Msg::Error);
-  }else{
-    pool::PoolMessageStream pms("get threshold");
-    pool::POOLContext::setMessageVerbosityLevel( pms.threshold() );
+   seal::PluginManager::get()->initialise();
+  seal::Context* context = new seal::Context;
+  seal::Handle<seal::ComponentLoader> loader = new seal::ComponentLoader( context );
+  loader->load( "SEAL/Services/MessageService" );
+  loader->load( "CORAL/Services/RelationalService" );
+  std::vector< seal::Handle<seal::IMessageService> > v_msgSvc;
+  context->query( v_msgSvc );
+  seal::Handle<seal::IMessageService> msgSvc;
+  if ( ! v_msgSvc.empty() ) {
+    msgSvc = v_msgSvc.front();
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Nil );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Verbose );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Debug );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Info );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Fatal );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Error );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Warning );
   }
-  seal::IHandle<seal::IMessageService> mesgsvc =
-    pool::POOLContext::context()->query<seal::IMessageService>("SEAL/Services/MessageService");
-  if( mesgsvc ){
-    //all logging go to cerr
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Nil );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Verbose );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Debug );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Info );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Fatal );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Error );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Warning );
-  } 
+  if(!::getenv( "POOL_OUTMSG_LEVEL" )){ //if not set, default to warning
+    msgSvc->setOutputLevel( seal::Msg::Error);
+  }else{
+    msgSvc->setOutputLevel( seal::Msg::Debug );
+  }
   boost::program_options::options_description desc("Allowed options");
   boost::program_options::options_description visible("Usage: remove_mapping contactstring mappingversion [-h]\n Options");
   visible.add_options()
@@ -79,61 +79,53 @@ int main(int argc, char** argv) {
   std::string contact=vm["contactString"].as<std::string>();
   std::string version=vm["version"].as<std::string>();
   //std::cout<<"contactString is "<<contact<<"\n";
-  seal::IHandle<pool::IRelationalService> serviceHandle = pool::POOLContext::context()->query<pool::IRelationalService>( "POOL/Services/RelationalService" );
+  seal::IHandle<coral::IRelationalService> serviceHandle = context->query<coral::IRelationalService>( "CORAL/Services/RelationalService" );
   if ( ! serviceHandle ) {
     std::cerr<<"[Error] Could not retrieve the relational service"<<std::endl;
     return 1;
   }
-  pool::IRelationalDomain& domain = serviceHandle->domainForConnection( contact );
-  std::auto_ptr< pool::IRelationalSession > session( domain.newSession( contact ) );
-  if ( ! session->connect() ) {
-    std::cerr<<"[Error] Could not connect to the database server."<<std::endl;
-    return 1;
-  }  
-  if ( ! session->transaction().start() ) {
-    std::cerr<<"[Error] Could not start a new transaction."<<std::endl;
-  }
+  coral::IRelationalDomain& domain = serviceHandle->domainForConnection( contact );
+  std::auto_ptr< coral::ISession > session( domain.newSession( contact ) );
+  session->connect();
+  session->transaction().start();
   try{
-    if( session->userSchema().existsTable("POOL_OR_MAPPING_VERSIONS") ) {
-      pool::IRelationalTable& table =session->userSchema().tableHandle("POOL_OR_MAPPING_VERSIONS");
-      pool::IRelationalTableDataEditor& dataEditor = table.dataEditor();
-      pool::AttributeListSpecification spec;
-      spec.push_back( "version", pool::AttributeStaticTypeInfo<std::string>::type_name() );
-      pool::AttributeList inputData( spec );
-      inputData["version"].setValue<std::string>( version );
+    if( session->nominalSchema().existsTable("POOL_OR_MAPPING_VERSIONS") ) {
+      coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_VERSIONS");
+      coral::ITableDataEditor& dataEditor = table.dataEditor();
+      coral::AttributeList inputData;
+      inputData.extend( "version", typeid(std::string) );
+      inputData["version"].data<std::string>()= version ;
       dataEditor.deleteRows( "MAPPING_VERSION = :version",inputData ); 
     }
-    if( session->userSchema().existsTable("POOL_OR_MAPPING_ELEMENTS") ) {
-      pool::IRelationalTable& table =session->userSchema().tableHandle("POOL_OR_MAPPING_ELEMENTS");
-      pool::IRelationalTableDataEditor& dataEditor = table.dataEditor();
-      pool::AttributeListSpecification spec;
-      spec.push_back( "version", pool::AttributeStaticTypeInfo<std::string>::type_name() );
-      pool::AttributeList inputData( spec );
-      inputData["version"].setValue<std::string>( version );
+    if( session->nominalSchema().existsTable("POOL_OR_MAPPING_ELEMENTS") ) {
+      coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_ELEMENTS");
+      coral::ITableDataEditor& dataEditor = table.dataEditor();
+      coral::AttributeList inputData;
+      inputData.extend( "version", typeid(std::string) );
+      inputData["version"].data<std::string>()=version;
       dataEditor.deleteRows( "VERSION = :version",inputData ); 
     }
-    if( session->userSchema().existsTable("POOL_OR_MAPPING_COLUMNS") ) {
-      pool::IRelationalTable& table =session->userSchema().tableHandle("POOL_OR_MAPPING_COLUMNS");
-      pool::IRelationalTableDataEditor& dataEditor = table.dataEditor();
-      pool::AttributeListSpecification spec;
-      spec.push_back( "version", pool::AttributeStaticTypeInfo<std::string>::type_name() );
-      pool::AttributeList inputData( spec );
-      inputData["version"].setValue<std::string>( version );
+    if( session->nominalSchema().existsTable("POOL_OR_MAPPING_COLUMNS") ) {
+      coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_COLUMNS");
+      coral::ITableDataEditor& dataEditor = table.dataEditor();
+      coral::AttributeList inputData;
+      inputData.extend( "version", typeid(std::string) );
+      inputData["version"].data<std::string>()=version;
       dataEditor.deleteRows( "VERSION = :version",inputData ); 
     }
-    if( session->userSchema().existsTable("POOL_RSS_CONTAINERS") ){
-      pool::IRelationalTable& table =session->userSchema().tableHandle("POOL_OR_MAPPING_COLUMNS");
-      pool::IRelationalTableDataEditor& dataEditor = table.dataEditor();
-      pool::AttributeListSpecification spec;
-      spec.push_back( "version", pool::AttributeStaticTypeInfo<std::string>::type_name() );
-      pool::AttributeList inputData( spec );
-      inputData["version"].setValue<std::string>( version );
+    if( session->nominalSchema().existsTable("POOL_RSS_CONTAINERS") ){
+      coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_COLUMNS");
+      coral::ITableDataEditor& dataEditor = table.dataEditor();
+      coral::AttributeList inputData;
+      inputData.extend( "version", typeid(std::string) );
+      inputData["version"].data<std::string>()=version;
       dataEditor.deleteRows( "MAPPING_VERSION = :version",inputData ); 
     }
-  }catch(const pool::RelationalException& er){
+  }/*catch(const coral::RelationalException& er){
     std::cerr<<"caught pool::RelationalException "<<er.what()<<std::endl;
     exit(-1);
-  }catch(const seal::Exception& er){
+    }*/
+  catch(const seal::Exception& er){
     std::cerr<<er.what()<<std::endl;
     if (er.code().isError()){
       exit(er.code().code());
@@ -144,11 +136,10 @@ int main(int argc, char** argv) {
   }catch( ... ) {
     std::cerr << "Funny error" << std::endl;
     exit(-1);
-    }
-  if ( ! session->transaction().commit() ) {
-    throw std::runtime_error( "Could not commit the transaction." );
   }
+  session->transaction().commit();
   session->disconnect();
+  delete context;
   return 0;
 }
   

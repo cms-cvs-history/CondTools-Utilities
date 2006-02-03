@@ -8,24 +8,26 @@
 #include "FileCatalog/IFileCatalog.h"
 #include "FileCatalog/URIParser.h"
 #include "FileCatalog/IFCAction.h"
-#include "RelationalAccess/RelationalException.h"
+#include "RelationalAccess/RelationalServiceException.h"
 #include "RelationalAccess/IRelationalService.h"
 #include "RelationalAccess/IRelationalDomain.h"
-#include "RelationalAccess/IRelationalSession.h"
-#include "RelationalAccess/IRelationalTransaction.h"
-#include "RelationalAccess/IRelationalSchema.h"
-#include "RelationalAccess/IRelationalTable.h"
-#include "RelationalAccess/IRelationalTableDataEditor.h"
-#include "RelationalAccess/IRelationalQuery.h"
-#include "RelationalAccess/IRelationalCursor.h"
-#include "AttributeList/AttributeList.h"
+#include "RelationalAccess/ISession.h"
+#include "RelationalAccess/ITransaction.h"
+#include "RelationalAccess/ISchema.h"
+#include "RelationalAccess/ITable.h"
+#include "RelationalAccess/ITableDataEditor.h"
+#include "RelationalAccess/IQuery.h"
+#include "RelationalAccess/ICursor.h"
+#include "CoralBase/AttributeList.h"
+#include "CoralBase/AttributeSpecification.h"
+#include "CoralBase/Attribute.h"
+#include "CoralBase/Exception.h"
 #include "StorageSvc/DbType.h"
 #include "PluginManager/PluginManager.h"
-#include "POOLCore/POOLContext.h"
-#include "POOLCore/PoolMessageStream.h"
+#include "SealKernel/ComponentLoader.h"
 #include "SealKernel/Context.h"
-#include "SealKernel/MessageStream.h"
 #include "SealKernel/Exception.h"
+#include "SealKernel/IMessageService.h"
 #include "SealKernel/Service.h"
 #include <stdexcept>
 #include <memory>
@@ -48,26 +50,28 @@ void printUsage(){
 
 int main(int argc, char** argv) {
   seal::PluginManager::get()->initialise();
-  pool::POOLContext::loadComponent( "SEAL/Services/MessageService" );
-  pool::POOLContext::loadComponent( "POOL/Services/RelationalService" );
-  if(!::getenv( "POOL_OUTMSG_LEVEL" )){ //if not set, default to warning
-    pool::POOLContext::setMessageVerbosityLevel(seal::Msg::Warning);
-  }else{
-    pool::PoolMessageStream pms("get threshold");
-    pool::POOLContext::setMessageVerbosityLevel( pms.threshold() );
+  seal::Context* context = new seal::Context;
+  seal::Handle<seal::ComponentLoader> loader = new seal::ComponentLoader( context );
+  loader->load( "SEAL/Services/MessageService" );
+  loader->load( "CORAL/Services/RelationalService" );
+  std::vector< seal::Handle<seal::IMessageService> > v_msgSvc;
+  context->query( v_msgSvc );
+  seal::Handle<seal::IMessageService> msgSvc;
+  if ( ! v_msgSvc.empty() ) {
+    msgSvc = v_msgSvc.front();
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Nil );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Verbose );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Debug );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Info );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Fatal );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Error );
+    msgSvc->setOutputStream( std::cerr, seal::Msg::Warning );
   }
-  seal::IHandle<seal::IMessageService> mesgsvc =
-    pool::POOLContext::context()->query<seal::IMessageService>("SEAL/Services/MessageService");
-  if( mesgsvc ){
-    //all logging go to cerr
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Nil );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Verbose );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Debug );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Info );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Fatal );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Error );
-    mesgsvc->setOutputStream( std::cerr, seal::Msg::Warning );
-  } 
+  if(!::getenv( "POOL_OUTMSG_LEVEL" )){ //if not set, default to warning
+    msgSvc->setOutputLevel( seal::Msg::Error);
+  }else{
+    msgSvc->setOutputLevel( seal::Msg::Debug );
+  }
   std::string  myuri, tabName, className, contName, cat, dictName, userName, password, mytag;
   bool infiov=false;
   try{
@@ -125,8 +129,8 @@ int main(int argc, char** argv) {
     exit(-1);
   }
   //must be load after the env is set
-  pool::POOLContext::loadComponent( "POOL/Services/EnvironmentAuthenticationService" );
-  seal::IHandle<seal::Service> authsvc = pool::POOLContext::context()->query<seal::Service>( "POOL/Services/EnvironmentAuthenticationService" );
+  loader->load( "CORAL/Services/EnvironmentAuthenticationService" );
+  seal::IHandle<seal::Service> authsvc = context->query<seal::Service>( "CORAL/Services/EnvironmentAuthenticationService" );
   if ( ! authsvc ) {
     throw std::runtime_error( "Could not retrieve the EnvironmentAuthenticationService" );
   }
@@ -157,50 +161,40 @@ int main(int argc, char** argv) {
     cond::TokenBuilder tk;
     tk.set(fid, dictName, className, contName );
     //prepare RAL queries
-    seal::IHandle<pool::IRelationalService> serviceHandle = pool::POOLContext::context()->query<pool::IRelationalService>( "POOL/Services/RelationalService" );
+    seal::IHandle<coral::IRelationalService> serviceHandle = context->query<coral::IRelationalService>( "CORAL/Services/RelationalService" );
     if ( ! serviceHandle ) {
       throw std::runtime_error( "Could not retrieve the relational service" );
     }
-    pool::IRelationalDomain& domain = serviceHandle->domainForConnection(myuri);
+    coral::IRelationalDomain& domain = serviceHandle->domainForConnection(myuri);
     // Creating a session
-    std::auto_ptr<pool::IRelationalSession> session(domain.newSession(myuri));
-    if ( ! session->connect() ) {
-      throw std::runtime_error( "Could not connect to the database server." );
-    }
+    std::auto_ptr<coral::ISession> session(domain.newSession(myuri));
+    session->connect();
     // Start a transaction
-    if ( ! session->transaction().start() ) {
-      throw std::runtime_error( "Could not start a new transaction." );
-    }
-    pool::IRelationalTable& table=session->userSchema().tableHandle(tabName);
+    session->transaction().start();
+    session->nominalSchema().tableHandle(tabName);
     //std::cout<< "Querying : SELECT IOV_VALUE_ID, TIME FROM "<<tabName<<std::endl;
-    std::auto_ptr< pool::IRelationalQuery > query1( table.createQuery() );
-    query1->setRowCacheSize( 10 );
+    std::auto_ptr< coral::IQuery > query1( session->nominalSchema().newQuery() );
+    query1->setRowCacheSize( 100 );
     query1->addToOutputList( "IOV_VALUE_ID" );
     if(!infiov){
       query1->addToOutputList( "TIME" );
     }
-    pool::IRelationalCursor& cursor1 = query1->process();
+    coral::ICursor& cursor1 = query1->execute();
     //loop over iov values
-    if( cursor1.start()) {
-      while( cursor1.next() ) {
-	const pool::AttributeList& row = cursor1.currentRow();
-	long myl;
-	row["IOV_VALUE_ID"].getValue<long>(myl);//the column name should be in DBCommon
-	tk.resetOID(myl);
-	if(!infiov){
-	  long mytime;
-	  row["TIME"].getValue<long>(mytime);//the column name should be in DBCommon
-	  myIov->iov[mytime]=tk.tokenAsString();
-	}else{
-	  long mytime=(long)edm::IOVSyncValue::endOfTime().eventID().run();
-	  myIov->iov[mytime]=tk.tokenAsString();
-	}
+    while( cursor1.next() ) {
+      const coral::AttributeList& row = cursor1.currentRow();
+      long myl=row["IOV_VALUE_ID"].data<long>();//the column name should be in DBCommon
+      tk.resetOID(myl);
+      if(!infiov){
+	long mytime=row["TIME"].data<long>();//the column name should be in DBCommon
+	myIov->iov[mytime]=tk.tokenAsString();
+      }else{
+	long mytime=(long)edm::IOVSyncValue::endOfTime().eventID().run();
+	myIov->iov[mytime]=tk.tokenAsString();
       }
     }
     
-    if ( ! session->transaction().commit() ) {
-      throw std::runtime_error( "Could not commit the transaction." );
-    }    
+    session->transaction().commit();    
     session->disconnect();
     
     //writing iov out
@@ -215,12 +209,14 @@ int main(int argc, char** argv) {
       std::cerr<< "Error: failed to tag token "<<iovtoken<<std::endl;
       exit(-1);
     }
-  }catch ( pool::RelationalException& re ) {
+  }
+  /*catch ( coral::Exception& re ) {
     std::cerr << "Relational exception from " << re.flavorName() << "    " << re.what() << std::endl;
     if (re.code().isError()){
-      exit(re.code().code());
+    exit(re.code().code());
     }
-  }catch(const seal::Exception& er){
+    }*/
+  catch(const seal::Exception& er){
     std::cerr<<"Seal exception "<< er.what()<<std::endl;
     if (er.code().isError()){
       exit(er.code().code());
@@ -232,6 +228,7 @@ int main(int argc, char** argv) {
     std::cerr << "Funny error" << std::endl;
     exit(-1);
   }
+  delete context;
 }
 
 
