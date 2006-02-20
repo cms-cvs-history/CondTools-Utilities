@@ -81,13 +81,12 @@ int main(int argc, char** argv) {
     std::cerr<<" please do "<<argv[0]<<" --help \n";
     return 1;
   }
-  std::string user;
+  std::string user("");
+  std::string userenv("CORAL_AUTH_USER=");
   std::string connect=vm["connect"].as<std::string>();
   if(vm.count("user")){
-    std::string userenv("CORAL_AUTH_USER=");
     user=vm["user"].as<std::string>();
     userenv+=user;
-    ::putenv( const_cast<char*>(userenv.c_str()) );
   }else{
     if(!::getenv( "CORAL_AUTH_USER" )){ 
       std::cerr <<"[Error] no user[u] option given and $CORAL_AUTH_USER is not set";
@@ -95,15 +94,14 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
-  std::string pass;
+  std::string pass("");
+  std::string passenv("CORAL_AUTH_PASSWORD=");
   if(vm.count("pass")){
-    std::string passenv("CORAL_AUTH_PASSWORD=");
     pass=vm["pass"].as<std::string>();
     passenv+=pass;
-    ::putenv(  const_cast<char*>(passenv.c_str()) );
   }else{
     if(!::getenv( "CORAL_AUTH_PASSWORD" )){ 
-      std::cerr <<"[Error] no pass[p] option given and $CORAL_AUTH_PASSWORD is not set";
+      std::cerr <<"[Error] no pass[p] option given and $CORAL_AUTH_PASSWORD is not set\n";
       std::cerr<<" please do "<<argv[0]<<" --help \n";
       return 1;
     }
@@ -170,6 +168,12 @@ int main(int argc, char** argv) {
     }else{
       loader->loadMessageService();
     }
+    if( !user.empty() ){
+      ::putenv(const_cast<char*>(userenv.c_str()));
+    }
+    if( !pass.empty() ){
+      ::putenv(const_cast<char*>(passenv.c_str()));
+    }
     loader->loadAuthenticationService(cond::Env);
     std::auto_ptr<pool::IFileCatalog> mycatalog(new pool::IFileCatalog);
     mycatalog->addReadCatalog(catalogname);
@@ -213,13 +217,13 @@ int main(int argc, char** argv) {
     //loop over iov values
     while( cursor1.next() ) {
       const coral::AttributeList& row = cursor1.currentRow();
-      long myl=row["IOV_VALUE_ID"].data<long>();
+      unsigned long myl=row["IOV_VALUE_ID"].data<unsigned long>();
       tk.resetOID(myl);
       if(!infiov){
-	long mytime=row["TIME"].data<long>();
+	unsigned long mytime=row["TIME"].data<unsigned long>();
 	myIov->iov[mytime]=tk.tokenAsString();
       }else{
-	long mytime=(long)edm::IOVSyncValue::endOfTime().eventID().run();
+	unsigned long mytime=(unsigned long)edm::IOVSyncValue::endOfTime().eventID().run();
 	myIov->iov[mytime]=tk.tokenAsString();
       }
     }
