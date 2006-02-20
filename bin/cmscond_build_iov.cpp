@@ -1,7 +1,10 @@
-#include "CondCore/DBCommon/interface/CommandLine.h"
-#include "CondCore/MetaDataService/interface/MetaData.h"
+//#include "CondCore/DBCommon/interface/CommandLine.h"
+#include "CondCore/DBCommon/interface/ServiceLoader.h"
 #include "CondCore/DBCommon/interface/TokenBuilder.h"
+#include "CondCore/DBCommon/interface/DBSession.h"
 #include "CondCore/DBCommon/interface/DBWriter.h"
+#include "CondCore/DBCommon/interface/Exception.h"
+#include "CondCore/MetaDataService/interface/MetaData.h"
 #include "CondCore/IOVService/interface/IOV.h"
 #include "FWCore/Framework/interface/IOVSyncValue.h"
 #include "FWCore/Utilities/interface/Exception.h"
@@ -23,135 +26,166 @@
 #include "CoralBase/Attribute.h"
 #include "CoralBase/Exception.h"
 #include "StorageSvc/DbType.h"
-#include "PluginManager/PluginManager.h"
-#include "SealKernel/ComponentLoader.h"
-#include "SealKernel/Context.h"
 #include "SealKernel/Exception.h"
-#include "SealKernel/IMessageService.h"
-#include "SealKernel/Service.h"
-#include <stdexcept>
 #include <memory>
-//#include <vector>
 #include <string>
+#include <iostream>
 #include <cstdlib>
-
-void printUsage(){
-  std::cout<<"usage: cms_build_iov -c -t -T -n [-f|-b|-d|-o|-m|-h]" <<std::endl; 
-  std::cout<<"-c contact string (mandatory)"<<std::endl;
-  std::cout<<"-t tablename (mandatory)"<<std::endl;
-  std::cout<<"-T tagname (mandatory)"<<std::endl;
-  std::cout<<"-n classname (payload class name, mandatory)"<<std::endl;
-  std::cout<<"-m containername(optional, default to classname)"<<std::endl;
-  std::cout<<"-f file catalog contact string (optional)"<<std::endl;
-  std::cout<<"-b build infinit iov (default mode: if TIME not found in the object table, assume infinit iov)"<<std::endl;
-  std::cout<<"-d dictionary name (mandatory)"<<std::endl;
-  std::cout<<" -h print help message" <<std::endl;
-}
+#include <boost/program_options.hpp>
 
 int main(int argc, char** argv) {
-  seal::PluginManager::get()->initialise();
-  seal::Context* context = new seal::Context;
-  seal::Handle<seal::ComponentLoader> loader = new seal::ComponentLoader( context );
-  loader->load( "SEAL/Services/MessageService" );
-  loader->load( "CORAL/Services/RelationalService" );
-  std::vector< seal::Handle<seal::IMessageService> > v_msgSvc;
-  context->query( v_msgSvc );
-  seal::Handle<seal::IMessageService> msgSvc;
-  if ( ! v_msgSvc.empty() ) {
-    msgSvc = v_msgSvc.front();
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Nil );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Verbose );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Debug );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Info );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Fatal );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Error );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Warning );
+  boost::program_options::options_description desc("options");
+  boost::program_options::options_description visible("Usage: cms_build_iov [options] [iov_name] \n");
+  visible.add_options()
+    ("connect,c",boost::program_options::value<std::string>(),"connection string(required)")
+    ("user,u",boost::program_options::value<std::string>(),"user name (default $CORAL_AUTH_USER)")
+    ("pass,p",boost::program_options::value<std::string>(),"password (default $CORAL_AUTH_PASSWORD)")
+    ("dictionary,d",boost::program_options::value<std::string>(),"dictionary(required)")
+    ("table,t",boost::program_options::value<std::string>(),"payload table name(required)")
+    ("object,o",boost::program_options::value<std::string>(),"payload object class name(required)")
+    ("container,C",boost::program_options::value<std::string>(),"payload object container name(default same as classname)")
+    ("catalog,f",boost::program_options::value<std::string>(),"file catalog contact string (default $POOL_CATALOG)")
+    ("infinite_iov,i","build infinite iov(default off)")
+    ("debug","print debug info (default off)")
+    ("help,h", "help message")
+    ;
+  boost::program_options::options_description hidden("argument");
+  hidden.add_options()
+    ("iov_name", boost::program_options::value<std::string>(), "name of iov")
+    ;
+  desc.add(visible).add(hidden);
+  boost::program_options::positional_options_description pd;
+  pd.add("iov_name",1);
+  boost::program_options::variables_map vm;
+  try{
+    boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).positional(pd).run(), vm);
+    boost::program_options::notify(vm);
+  }catch(const boost::program_options::error& er) {
+    std::cerr << er.what()<<std::endl;
+    return 1;
   }
-  if(!::getenv( "POOL_OUTMSG_LEVEL" )){ //if not set, default to warning
-    msgSvc->setOutputLevel( seal::Msg::Error);
-  }else{
-    msgSvc->setOutputLevel( seal::Msg::Debug );
-  }
-  std::string  myuri, tabName, className, contName, cat, dictName, userName, password, mytag;
+  bool debug=false;
   bool infiov=false;
+  if (vm.count("help")) {
+    std::cout << visible <<std::endl;;
+    return 0;
+  }
+  if(vm.count("debug")) {
+    debug=true;
+  }
+  if(vm.count("infinite_iov")){
+    infiov=true;
+  }
+  if(!vm.count("connect")){
+    std::cerr <<"[Error] no connect[c] option given \n";
+    std::cerr<<" please do "<<argv[0]<<" --help \n";
+    return 1;
+  }
+  std::string user;
+  std::string connect=vm["connect"].as<std::string>();
+  if(vm.count("user")){
+    std::string userenv("CORAL_AUTH_USER=");
+    user=vm["user"].as<std::string>();
+    userenv+=user;
+    ::putenv( const_cast<char*>(userenv.c_str()) );
+  }else{
+    if(!::getenv( "CORAL_AUTH_USER" )){ 
+      std::cerr <<"[Error] no user[u] option given and $CORAL_AUTH_USER is not set";
+      std::cerr<<" please do "<<argv[0]<<" --help \n";
+      return 1;
+    }
+  }
+  std::string pass;
+  if(vm.count("pass")){
+    std::string passenv("CORAL_AUTH_PASSWORD=");
+    pass=vm["pass"].as<std::string>();
+    passenv+=pass;
+    ::putenv(  const_cast<char*>(passenv.c_str()) );
+  }else{
+    if(!::getenv( "CORAL_AUTH_PASSWORD" )){ 
+      std::cerr <<"[Error] no pass[p] option given and $CORAL_AUTH_PASSWORD is not set";
+      std::cerr<<" please do "<<argv[0]<<" --help \n";
+      return 1;
+    }
+  }
+  if(!vm.count("dictionary")){
+    std::cerr <<"[Error] no dictionary[d] option given \n";
+    std::cerr<<" please do "<<argv[0]<<" --help \n";
+    return 1;
+  }
+  std::string dictionary=vm["dictionary"].as<std::string>();
+  if(!vm.count("table")){
+    std::cerr <<"[Error] no table[t] option given \n";
+    std::cerr<<" please do "<<argv[0]<<" --help \n";
+    return 1;
+  }
+  std::string table=vm["table"].as<std::string>();
+  if(!vm.count("object")){
+    std::cerr <<"[Error] no object[o] option given \n";
+    std::cerr<<" please do "<<argv[0]<<" --help \n";
+    return 1;
+  }
+  std::string objectname=vm["object"].as<std::string>();
+  std::string containername;
+  if( !vm.count("container") ){
+    containername=objectname;
+  }else{
+    containername=vm["container"].as<std::string>();
+  }
+  std::string catalogname;
+  if( !vm.count("catalog") ){
+    if(!::getenv("POOL_CATALOG")){
+      catalogname="file:PoolFileCatalog.xml";
+    }else{
+      catalogname=std::string(::getenv("POOL_CATALOG"));
+    }
+  }else{
+    catalogname=vm["catalog"].as<std::string>();
+  }
+  std::string tag;
+  if( !vm.count("iov_name") ){
+    std::cerr <<"[Error] No iov_name argument given \n";
+    std::cerr<<" please do "<<argv[0]<<" --help \n";
+    return 1;
+  }else{
+    tag=vm["iov_name"].as<std::string>();
+  }
+  if(debug) {
+    std::cout<<"\t connect: "<<connect<<"\n";
+    std::cout<<"\t user: "<<user<<"\n";
+    std::cout<<"\t pass: "<<pass<<"\n";
+    std::cout<<"\t dictionary: "<<dictionary<<"\n";
+    std::cout<<"\t table: "<<table<<"\n";
+    std::cout<<"\t objectname: "<<objectname<<"\n";
+    std::cout<<"\t containername: "<<containername<<"\n";
+    std::cout<<"\t catalog: "<<catalogname<<"\n";
+    std::cout<<"\t infinite IOV: "<<infiov<<"\n";
+    std::cout<<"\t iov_name: "<<tag<<"\n";
+  }
+  ///end of command parsing
+  cond::ServiceLoader* loader=new cond::ServiceLoader;
   try{
-    cond::CommandLine commands(argc,argv);
-    if( commands.Exists("h") ){
-      printUsage();
-      exit(0);
-    }
-    if( commands.Exists("c") ){
-      myuri=commands.GetByName("c");
+    if(debug) {
+      loader->loadMessageService(cond::Debug);
     }else{
-      std::cerr<<"Error: must specify db contact string(-c)"<<std::endl;
-      exit(-1);
-    }    
-    if( commands.Exists("t") ){
-      tabName=commands.GetByName("t");
-    }else{
-      std::cerr<<"Error: must specify table name(-t)"<<std::endl;
-      exit(-1);
+      loader->loadMessageService();
     }
-    if( commands.Exists("T") ){
-      mytag=commands.GetByName("T");
-    }
-    if( commands.Exists("n") ){
-      className=commands.GetByName("n");
-    }else{
-      std::cerr<<"Error: must specify payload class name(-n)"<<std::endl;
-      exit(-1);
-    }
-    if( commands.Exists("m") ){
-      contName=commands.GetByName("m");
-    }else{
-      contName=className;
-    }
-    if( commands.Exists("f") ){
-      cat=commands.GetByName("f");
-    }else{
-      pool::URIParser p;
-      p.parse();   
-      cat=p.contactstring();
-    }
-    if( commands.Exists("b") ){
-      infiov=true;
-    }
-    if( commands.Exists("d") ){
-      dictName=commands.GetByName("d");
-    }
-  }catch(std::string& strError){
-    std::cerr<< "Error: command parsing error "<<strError<<std::endl;
-    exit(-1);
-  }
-  
-  if(dictName.empty()){
-    std::cerr<< "Error: must specify dictionary name(-d)" <<std::endl;
-    exit(-1);
-  }
-  //must be load after the env is set
-  loader->load( "CORAL/Services/EnvironmentAuthenticationService" );
-  seal::IHandle<seal::Service> authsvc = context->query<seal::Service>( "CORAL/Services/EnvironmentAuthenticationService" );
-  if ( ! authsvc ) {
-    throw std::runtime_error( "Could not retrieve the EnvironmentAuthenticationService" );
-  }
-  
-  try{
-    // catalog lookups
+    loader->loadAuthenticationService(cond::Env);
     std::auto_ptr<pool::IFileCatalog> mycatalog(new pool::IFileCatalog);
-    mycatalog->addReadCatalog(cat);
+    mycatalog->addReadCatalog(catalogname);
     pool::FClookup l;
     mycatalog->setAction(l);
     mycatalog->connect();
     mycatalog->start();
     pool::FileCatalog::FileID fid;
     std::string ftype;
-    l.lookupFileByPFN(myuri,fid,ftype);
+    l.lookupFileByPFN(connect,fid,ftype);
     if(fid.empty()){
-      std::cerr<<"Error: "<<myuri<<" is not registered in the catalog "<<cat<<std::endl;
-      exit(-1);
+      std::cerr<<"Error: "<<connect<<" is not registered in the catalog "<<catalogname<<std::endl;
+      exit(1);
     }else if( ftype!=pool::POOL_RDBMS_StorageType.storageName() ){
-      std::cerr<<"Error: "<<myuri<<" is registered in the catalog "<<cat<<" but has the wrong storage type: "<<ftype<<std::endl;
-      exit(-1);
+      std::cerr<<"Error: "<<connect<<" is registered in the catalog "<<catalogname<<" with the wrong storage type: "<<ftype<<std::endl;
+      exit(1);
     }
     mycatalog->commit();  
     mycatalog->disconnect();
@@ -159,21 +193,17 @@ int main(int argc, char** argv) {
     cond::IOV* myIov=new cond::IOV;
     //prepare tokenBuilder
     cond::TokenBuilder tk;
-    tk.set(fid, dictName, className, contName );
-    //prepare RAL queries
-    seal::IHandle<coral::IRelationalService> serviceHandle = context->query<coral::IRelationalService>( "CORAL/Services/RelationalService" );
-    if ( ! serviceHandle ) {
-      throw std::runtime_error( "Could not retrieve the relational service" );
-    }
-    coral::IRelationalDomain& domain = serviceHandle->domainForConnection(myuri);
-    // Creating a session
-    std::auto_ptr<coral::ISession> session(domain.newSession(myuri));
-    session->connect();
-    // Start a transaction
-    session->transaction().start();
-    session->nominalSchema().tableHandle(tabName);
+    tk.set(fid, dictionary, objectname, containername );
+    
+    coral::IRelationalService& relationalService=loader->loadRelationalService();
+    coral::IRelationalDomain& domain = relationalService.domainForConnection(connect);
+    coral::ISession* coralsession = domain.newSession( connect );
+    coralsession->connect();
+    coralsession->startUserSession();
+    coralsession->transaction().start();
+    coral::ITable& mytable=coralsession->nominalSchema().tableHandle(table);
     //std::cout<< "Querying : SELECT IOV_VALUE_ID, TIME FROM "<<tabName<<std::endl;
-    std::auto_ptr< coral::IQuery > query1( session->nominalSchema().newQuery() );
+    std::auto_ptr< coral::IQuery > query1( mytable.newQuery() );
     query1->setRowCacheSize( 100 );
     query1->addToOutputList( "IOV_VALUE_ID" );
     if(!infiov){
@@ -183,52 +213,56 @@ int main(int argc, char** argv) {
     //loop over iov values
     while( cursor1.next() ) {
       const coral::AttributeList& row = cursor1.currentRow();
-      long myl=row["IOV_VALUE_ID"].data<long>();//the column name should be in DBCommon
+      long myl=row["IOV_VALUE_ID"].data<long>();
       tk.resetOID(myl);
       if(!infiov){
-	long mytime=row["TIME"].data<long>();//the column name should be in DBCommon
+	long mytime=row["TIME"].data<long>();
 	myIov->iov[mytime]=tk.tokenAsString();
       }else{
 	long mytime=(long)edm::IOVSyncValue::endOfTime().eventID().run();
 	myIov->iov[mytime]=tk.tokenAsString();
       }
     }
-    
-    session->transaction().commit();    
-    session->disconnect();
-    
+    coralsession->transaction().commit();    
+    coralsession->disconnect();
+    delete coralsession;
     //writing iov out
-    cond::DBWriter dbwriter(myuri);
-    dbwriter.startTransaction();
-    std::string iovtoken=dbwriter.write<cond::IOV>(myIov, "IOV");
-    dbwriter.commitTransaction();
-    std::cout<<mytag<<" "<<iovtoken<<std::endl;//print result to std::cout
-    cond::MetaData meta(myuri);
-    bool result=meta.addMapping(mytag, iovtoken);
+    cond::DBSession poolsession(connect,catalogname);
+    poolsession.connect( cond::ReadWriteCreate );
+    cond::DBWriter iovwriter(poolsession,"IOV");
+    poolsession.startUpdateTransaction();
+    std::string iovtoken=iovwriter.markWrite<cond::IOV>(myIov);
+    poolsession.commit();
+    poolsession.disconnect();
+    if(debug) std::cout<<tag<<" "<<iovtoken<<std::endl;
+    
+    cond::MetaData meta(connect,*loader);
+    meta.connect();
+    bool result=meta.addMapping(tag, iovtoken);
     if(!result){
       std::cerr<< "Error: failed to tag token "<<iovtoken<<std::endl;
-      exit(-1);
+      exit(1);
     }
+    meta.disconnect();
+  }catch(const cond::Exception& er){
+    std::cerr<<"cond::Exception "<< er.what()<<std::endl;
+    delete loader;
+    exit(1);
+  }catch(const cms::Exception& er){
+    std::cerr<<"cms::Exception "<< er.what()<<std::endl;
+    delete loader;
+    exit(1);
+  }catch(const seal::Exception& er){
+    std::cerr<<"seal::Exception "<< er.what()<<std::endl;
+    delete loader;
+    exit(1);
+  }catch(...){
+    std::cerr<<"Unknown error "<<std::endl;
+    delete loader;
+    exit(1);
   }
-  /*catch ( coral::Exception& re ) {
-    std::cerr << "Relational exception from " << re.flavorName() << "    " << re.what() << std::endl;
-    if (re.code().isError()){
-    exit(re.code().code());
-    }
-    }*/
-  catch(const seal::Exception& er){
-    std::cerr<<"Seal exception "<< er.what()<<std::endl;
-    if (er.code().isError()){
-      exit(er.code().code());
-    }
-  }catch( cms::Exception& e ) {
-    std::cerr << "cms exception "<<e.what() << std::endl;
-    exit(-1);
-  }catch( ... ) {
-    std::cerr << "Funny error" << std::endl;
-    exit(-1);
-  }
-  delete context;
+  delete loader;
+  return 0;
 }
 
 
