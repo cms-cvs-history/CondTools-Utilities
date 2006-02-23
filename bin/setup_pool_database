@@ -89,9 +89,9 @@ class setup_pool_database:
 
     def setupdb(self):
        if self.username and self.password:
-         mycmd=' '.join(['pool_setup_database',' -f', self.setupfilename, '-d', self.dictname ,'-c', self.dbname, '-u', self.username, '-p', self.password])
+         mycmd=' '.join(['pool_setup_database',' -f', os.path.join(self.outdir,self.setupfilename), '-d', self.dictname ,'-c', self.dbname, '-u', self.username, '-p', self.password])
        else:
-         mycmd=' '.join(['pool_setup_database',' -f', self.setupfilename, '-d', self.dictname ,'-c', self.dbname])
+         mycmd=' '.join(['pool_setup_database',' -f', os.path.join(self.outdir,self.setupfilename), '-d', self.dictname ,'-c', self.dbname])
        if self.parser.values.verbose : print mycmd
        os.system(mycmd)
 
