@@ -213,6 +213,8 @@ int main(int argc, char** argv) {
     if(!infiov){
       query1->addToOutputList( "TIME" );
     }
+    query1->defineOutputType( "IOV_VALUE_ID","unsigned long" );
+    query1->defineOutputType( "TIME","unsigned long" );
     coral::ICursor& cursor1 = query1->execute();
     //loop over iov values
     while( cursor1.next() ) {
