@@ -5,7 +5,8 @@
 #   -In case of oracle database, a preallocated oracle catalog is used; in case of sqlite database, the datafile and the catalog file, PoolFileCatalog.xml,generated when writing the data should ALWAYS be moved around together
 #INSTRUCTION:
 #   -mkdir ${workingdir}
-#   -cd ${workingdir}; download this script; 
+#   -bootstrap ${CMSSWVERSION} project in the workingdir
+#   -cd ${CMSSWVERSION}; download this script; 
 #   -Change the setup environment section according to the parameters you use for the test
 #    -chmod a+x condReaderTest.sh
 #    -./condReaderTest.sh
@@ -14,8 +15,10 @@
 # setup environment and user parameters
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 THISDIR=`pwd`
-CMSSWVERSION=CMSSW_0_5_0_pre4 #change to the CMSSW version for testing
 export SCRAM_ARCH=slc3_ia32_gcc323
+CMSSWVERSION=CMSSW_2006-02-24 #change!!!
+OWNER=ECAL #change!!!
+OWNERPASS=cern2006x #change!!!
 MAXEVENTS=10
 FIRSTRUN=1
 EVENTSINRUN=1
@@ -23,9 +26,8 @@ SERVICENAME=devdb10
 SERVERNAME=devdb10
 SERVERHOSTNAME=oradev10.cern.ch
 OWNERSCHEMA=CMS_COND_${OWNER}
-OWNERPASS=cern2006x #change!!!
 GENSCHEMA=CMS_COND_GENERAL
-LOCALCATALOG=file:conddbcatalog.xml
+LOCALCATALOG=conddbcatalog.xml
 # ------------------------------------------------------------------------
 # setup_tns ()
 # write tnsnames.ora in the current directory and set variable TNS_ADMIN for running this job to this directory
@@ -77,7 +79,8 @@ write_config() {
 CONFFILE=condRead$2.cfg
 local CONNECT=oracle://${SERVERNAME}/${OWNERSCHEMA}
 local RCD=$2Rcd
-local TAG=`echo $1| awk '{print tolower($1)}'`_test
+#local TAG=`echo $1| awk '{print tolower($1)}'`_test 
+local TAG=ecal_test #change!!!
 /bin/cat >  ${CONFFILE} <<EOI
   process condTEST = {
 	path p = { get }
@@ -88,7 +91,7 @@ local TAG=`echo $1| awk '{print tolower($1)}'`_test
                                     } }
 		    		    bool loadAll = true
                                     string connect = "${CONNECT}"
-                                    untracked string catalog = "${LOCALCATALOG}"
+                                    untracked string catalog = "file:${LOCALCATALOG}"
 			            string timetype = "runnumber" 
                                     untracked uint32 authenticationMethod = 0
 				   }
@@ -109,26 +112,31 @@ return 0
 }
 
 #main
-bootstrap_cmssw ${CMSSWVERSION}
-echo "[---JOB LOG---] bootstrap_cmssw status $?"
+#bootstrap_cmssw ${CMSSWVERSION}
+#echo "[---JOB LOG---] bootstrap_cmssw status $?"
 #
 #uncomment this if your working node doesnot recognise devdb10
 #
 #setup_tns
 #echo  "[---JOB LOG---] setup_tns status $?"
 export CORAL_AUTH_USER=${OWNERSCHEMA}
+echo ${OWNERSCHEMA}
 export CORAL_AUTH_PASSWORD=${OWNERPASS}
+echo ${OWNERPASS}
 rm -f ${THISDIR}/${LOCALCATALOG}
 echo "[---JOB LOG---] Publishing catalog"
+echo "FCpublish -u relationalcatalog_oracle://${SERVERNAME}/${GENSCHEMA} -d file:${LOCALCATALOG}"
 FCpublish -u relationalcatalog_oracle://${SERVERNAME}/${GENSCHEMA} -d file:${LOCALCATALOG}
+echo "[---JOB LOG---] done"
 export POOL_CATALOG=file:${THISDIR}/${LOCALCATALOG}
-for PARAM in "ECAL EcalPedestals" "HCAL HcalPedestals"; do
+for PARAM in "ECAL EcalPedestals" ; do
   set -- $PARAM
   write_config $1 $2 ${MAXEVENTS} ${FIRSTRUN} ${EVENTSINRUN}
   echo "[---JOB LOG---] write_config $1 status $?"
   echo "[---JOB LOG---] running job for $1 $2 using ${CONFFILE}" 
   time cmsRun --parameter-set ${CONFFILE}
 done
+echo "[---JOB LOG---] done"
 exit 0
 
 

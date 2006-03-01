@@ -48,6 +48,6 @@ export POOL_CATALOG=file:${THISDIR}/conddbcatalog.xml
 MYAPP=OfflinePedWriter  #your writer application name
 echo "Running ${MYAPP}"
 export CONNECT=oracle://devdb10/${CORAL_AUTH_USER}
-export TAG=ecal_test      #tag. please change to your tag
+export TAG=ecal_test      #tag. please change to your tag!!!
 echo "Using TNS_ADMIN ${TNS_ADMIN}"
 ${LOCALRT}/test/${SCRAM_ARCH}/${MYAPP} ${CONNECT} 10 ${TAG}
