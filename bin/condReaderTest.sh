@@ -14,17 +14,18 @@
 # setup environment and user parameters
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 THISDIR=`pwd`
-CMSSWVERSION=CMSSW_0_2_0_pre5 #change to the CMSSW version for testing
+CMSSWVERSION=CMSSW_0_5_0_pre4 #change to the CMSSW version for testing
 export SCRAM_ARCH=slc3_ia32_gcc323
 MAXEVENTS=10
 FIRSTRUN=1
 EVENTSINRUN=1
-SERVICENAME=cms_val_lb
-SERVERNAME=${SERVICENAME}.cern.ch
-SERVERHOSTNAME=int2r1-v.cern.ch
-GENREADER=CMS_VAL_GENERAL_POOL_READER
-GENREADERPASS=val_gen_rea_1031
-GENSCHEMA=CMS_VAL_GENERAL_POOL_OWNER
+SERVICENAME=devdb10
+SERVERNAME=devdb10
+SERVERHOSTNAME=oradev10.cern.ch
+OWNERSCHEMA=CMS_COND_${OWNER}
+OWNERPASS=cern2006x #change!!!
+GENSCHEMA=CMS_COND_GENERAL
+LOCALCATALOG=file:conddbcatalog.xml
 # ------------------------------------------------------------------------
 # setup_tns ()
 # write tnsnames.ora in the current directory and set variable TNS_ADMIN for running this job to this directory
@@ -35,18 +36,19 @@ setup_tns() {
 local TNSFILE=tnsnames.ora
 rm -f ${TNSFILE}
 /bin/cat >  ${TNSFILE} <<EOI
-${SERVERNAME} =
-   (DESCRIPTION =
-     (ADDRESS = (PROTOCOL = TCP)(HOST = ${SERVERHOSTNAME})(PORT = 1521))
-     (LOAD_BALANCE = yes)
-     (CONNECT_DATA =
-       (SERVER = DEDICATED)
-       (SERVICE_NAME = ${SERVICENAME})
-     )
-)
+devdb10=(DESCRIPTION=
+        (ADDRESS=
+                (PROTOCOL=TCP)
+                (HOST=oradev10.cern.ch)
+                (PORT=10520)
+        )
+        (CONNECT_DATA=
+                (SID=D10))
+        )
 EOI
-export TNS_ADMIN=${THISDIR}
-echo "[---JOB LOG---] Using TNS_ADMIN=${TNS_ADMIN}, ORACLE server ${SERVERNAME} at host ${SERVERHOSTNAME}"
+#uncomment if your working node doesnot recognise devdb10
+#export TNS_ADMIN=${THISDIR}
+#echo "[---JOB LOG---] Using TNS_ADMIN=${TNS_ADMIN}, ORACLE server ${SERVERNAME} at host ${SERVERHOSTNAME}"
 return 0
 }
 #-------------------------------------------------------------------------
@@ -73,12 +75,12 @@ return 0
 # ------------------------------------------------------------------------
 write_config() {
 CONFFILE=condRead$2.cfg
-local CONNECT=oracle://${SERVERNAME}/CMS_VAL_${1}_POOL_OWNER
+local CONNECT=oracle://${SERVERNAME}/${OWNERSCHEMA}
 local RCD=$2Rcd
-local TAG=`echo $1| awk '{print tolower($1)}'`fall_test
+local TAG=`echo $1| awk '{print tolower($1)}'`_test
 /bin/cat >  ${CONFFILE} <<EOI
   process condTEST = {
-	path p = { get & print }
+	path p = { get }
 
 	es_source = PoolDBESSource { VPSet toGet = {
                                    {string record = "${RCD}"
@@ -86,10 +88,10 @@ local TAG=`echo $1| awk '{print tolower($1)}'`fall_test
                                     } }
 		    		    bool loadAll = true
                                     string connect = "${CONNECT}"
+                                    untracked string catalog = "${LOCALCATALOG}"
 			            string timetype = "runnumber" 
+                                    untracked uint32 authenticationMethod = 0
 				   }
-
-	module print = AsciiOutputModule { }
 	
 	source = EmptySource {untracked int32 maxEvents = $3 
                 untracked uint32 firstRun = $4 
@@ -109,15 +111,17 @@ return 0
 #main
 bootstrap_cmssw ${CMSSWVERSION}
 echo "[---JOB LOG---] bootstrap_cmssw status $?"
-setup_tns
-echo  "[---JOB LOG---] setup_tns status $?"
-export POOL_AUTH_USER=${GENREADER}
-export POOL_AUTH_PASSWORD=${GENREADERPASS}
-rm -f ${THISDIR}/conddbcatalog.xml
+#
+#uncomment this if your working node doesnot recognise devdb10
+#
+#setup_tns
+#echo  "[---JOB LOG---] setup_tns status $?"
+export CORAL_AUTH_USER=${OWNERSCHEMA}
+export CORAL_AUTH_PASSWORD=${OWNERPASS}
+rm -f ${THISDIR}/${LOCALCATALOG}
 echo "[---JOB LOG---] Publishing catalog"
-FCpublish -u relationalcatalog_oracle://${SERVERNAME}/${GENSCHEMA} -d file:conddbcatalog.xml
-export POOL_CATALOG=file:${THISDIR}/conddbcatalog.xml
-#export POOL_OUTMSG_LEVEL=8
+FCpublish -u relationalcatalog_oracle://${SERVERNAME}/${GENSCHEMA} -d file:${LOCALCATALOG}
+export POOL_CATALOG=file:${THISDIR}/${LOCALCATALOG}
 for PARAM in "ECAL EcalPedestals" "HCAL HcalPedestals"; do
   set -- $PARAM
   write_config $1 $2 ${MAXEVENTS} ${FIRSTRUN} ${EVENTSINRUN}
