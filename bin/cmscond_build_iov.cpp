@@ -45,6 +45,8 @@ int main(int argc, char** argv) {
     ("object,o",boost::program_options::value<std::string>(),"payload object class name(required)")
     ("container,C",boost::program_options::value<std::string>(),"payload object container name(default same as classname)")
     ("catalog,f",boost::program_options::value<std::string>(),"file catalog contact string (default $POOL_CATALOG)")
+    ("appendiov,a","append new data to an existing tag(default off), not valid for infinite IOV")
+    ("appendiov_check,A","append new data to an existing tag, checking if real append(default off), not valid for infinite IOV")
     ("infinite_iov,i","build infinite iov(default off)")
     ("debug","print debug info (default off)")
     ("help,h", "help message")
@@ -66,6 +68,8 @@ int main(int argc, char** argv) {
   }
   bool debug=false;
   bool infiov=false;
+  bool appendiov=false;
+  bool appendiov_check=false;
   if (vm.count("help")) {
     std::cout << visible <<std::endl;;
     return 0;
@@ -80,6 +84,20 @@ int main(int argc, char** argv) {
     std::cerr <<"[Error] no connect[c] option given \n";
     std::cerr<<" please do "<<argv[0]<<" --help \n";
     return 1;
+  }
+  if(vm.count("appendiov")){
+    if(infiov){
+      std::cerr<<"cannot append to infinite IOV \n";
+      return 1;
+    }
+    appendiov=true;
+  }
+  if(vm.count("appendiov_check")){
+    if(infiov){
+      std::cerr<<"cannot append to infinite IOV \n";
+      return 1;
+    }
+    appendiov_check=true;
   }
   std::string user("");
   std::string userenv("CORAL_AUTH_USER=");
@@ -158,6 +176,8 @@ int main(int argc, char** argv) {
     std::cout<<"\t containername: "<<containername<<"\n";
     std::cout<<"\t catalog: "<<catalogname<<"\n";
     std::cout<<"\t infinite IOV: "<<infiov<<"\n";
+    std::cout<<"\t appendiov: "<<appendiov<<"\n";
+    std::cout<<"\t appendiov_: "<<appendiov_check<<"\n";
     std::cout<<"\t iov_name: "<<tag<<"\n";
   }
   ///end of command parsing
