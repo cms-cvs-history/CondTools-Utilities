@@ -46,7 +46,6 @@ int main(int argc, char** argv) {
     ("container,C",boost::program_options::value<std::string>(),"payload object container name(default same as classname)")
     ("catalog,f",boost::program_options::value<std::string>(),"file catalog contact string (default $POOL_CATALOG)")
     ("appendiov,a","append new data to an existing tag(default off), not valid for infinite IOV")
-    ("appendiov_check,A","append new data to an existing tag, checking if real append(default off), not valid for infinite IOV")
     ("infinite_iov,i","build infinite iov(default off)")
     ("debug","print debug info (default off)")
     ("help,h", "help message")
@@ -69,7 +68,7 @@ int main(int argc, char** argv) {
   bool debug=false;
   bool infiov=false;
   bool appendiov=false;
-  bool appendiov_check=false;
+  //bool appendiov_check=false;
   if (vm.count("help")) {
     std::cout << visible <<std::endl;;
     return 0;
@@ -91,13 +90,6 @@ int main(int argc, char** argv) {
       return 1;
     }
     appendiov=true;
-  }
-  if(vm.count("appendiov_check")){
-    if(infiov){
-      std::cerr<<"cannot append to infinite IOV \n";
-      return 1;
-    }
-    appendiov_check=true;
   }
   std::string user("");
   std::string userenv("CORAL_AUTH_USER=");
@@ -177,7 +169,6 @@ int main(int argc, char** argv) {
     std::cout<<"\t catalog: "<<catalogname<<"\n";
     std::cout<<"\t infinite IOV: "<<infiov<<"\n";
     std::cout<<"\t appendiov: "<<appendiov<<"\n";
-    std::cout<<"\t appendiov_: "<<appendiov_check<<"\n";
     std::cout<<"\t iov_name: "<<tag<<"\n";
   }
   ///end of command parsing
@@ -213,6 +204,7 @@ int main(int argc, char** argv) {
     }
     mycatalog->commit();  
     mycatalog->disconnect();
+
     //create IOV object
     cond::IOV* myIov=new cond::IOV;
     //prepare tokenBuilder
@@ -264,7 +256,12 @@ int main(int argc, char** argv) {
     
     cond::MetaData meta(connect,*loader);
     meta.connect();
-    bool result=meta.addMapping(tag, iovtoken);
+    bool result=false;
+    if( !appendiov ){
+      result=meta.addMapping(tag,iovtoken);
+    }else{
+      result=meta.replaceToken(tag,iovtoken);
+    }
     if(!result){
       std::cerr<< "Error: failed to tag token "<<iovtoken<<std::endl;
       exit(1);
