@@ -205,6 +205,13 @@ int main(int argc, char** argv) {
     mycatalog->commit();  
     mycatalog->disconnect();
 
+    cond::MetaData meta(connect,*loader);
+    std::string myoldIOVtoken;
+    if( appendiov ){
+      meta.connect();
+      myoldIOVtoken=meta.getToken(tag);
+      meta.disconnect();
+    }
     //create IOV object
     cond::IOV* myIov=new cond::IOV;
     //prepare tokenBuilder
@@ -250,11 +257,13 @@ int main(int argc, char** argv) {
     cond::DBWriter iovwriter(poolsession,"IOV");
     poolsession.startUpdateTransaction();
     std::string iovtoken=iovwriter.markWrite<cond::IOV>(myIov);
+    if( appendiov ){
+      iovwriter.markDelete<cond::IOV>(myoldIOVtoken);
+    }
     poolsession.commit();
     poolsession.disconnect();
     if(debug) std::cout<<tag<<" "<<iovtoken<<std::endl;
     
-    cond::MetaData meta(connect,*loader);
     meta.connect();
     bool result=false;
     if( !appendiov ){
