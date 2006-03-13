@@ -50,6 +50,8 @@ class create_default_mapping:
        f.close()
 
     def dumpdefaultmapping(self):
+       os.putenv("CORAL_AUTH_USER", "me")
+       os.putenv("CORAL_AUTH_PASSWORD", "mypass") 
        mycmd=' '.join(['pool_build_object_relational_mapping',' -f', os.path.join(self.outdir,self.templatename), '-o', os.path.join(self.outdir,self.outmapname), '-b', '-d', self.dictname ,'-c','sqlite_file:'+os.path.join(self.outdir,self.dummyname) ])
        if self.parser.values.verbose : print mycmd
        os.system(mycmd)
