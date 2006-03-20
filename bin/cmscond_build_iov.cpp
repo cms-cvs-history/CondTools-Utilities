@@ -231,26 +231,45 @@ int main(int argc, char** argv) {
     query1->addToOutputList( "IOV_VALUE_ID" );
     if(!infiov){
       query1->addToOutputList( "TIME" );
+      query1->addToOrderList( "TIME" );
     }
     query1->defineOutputType( "IOV_VALUE_ID","unsigned long" );
     query1->defineOutputType( "TIME","unsigned long" );
     coral::ICursor& cursor1 = query1->execute();
-    //loop over iov values
+    //loop over iov values offsetting TIME->object by 1 place and 
+    //setting the last object to have an infinite iov
+
+    int rowNum = 0;
+    std::string lastObject = "";
+
     while( cursor1.next() ) {
+      rowNum++;
       const coral::AttributeList& row = cursor1.currentRow();
       unsigned long myl=row["IOV_VALUE_ID"].data<unsigned long>();
       tk.resetOID(myl);
       if(!infiov){
+	if (rowNum == 1) { 
+	  lastObject = tk.tokenAsString();
+	  continue; 
+	}
 	unsigned long mytime=row["TIME"].data<unsigned long>();
-	myIov->iov[mytime]=tk.tokenAsString();
+	myIov->iov[mytime]=lastObject;
+	lastObject=tk.tokenAsString();
       }else{
 	unsigned long mytime=(unsigned long)edm::IOVSyncValue::endOfTime().eventID().run();
 	myIov->iov[mytime]=tk.tokenAsString();
       }
     }
+    
+    if (!infiov) {
+      unsigned long mytime=(unsigned long)edm::IOVSyncValue::endOfTime().eventID().run();
+      myIov->iov[mytime]=lastObject;
+    }
+
     coralsession->transaction().commit();    
     coralsession->disconnect();
     delete coralsession;
+
     //writing iov out
     cond::DBSession poolsession(connect,catalogname);
     poolsession.connect( cond::ReadWriteCreate );
