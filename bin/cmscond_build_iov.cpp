@@ -26,7 +26,7 @@
 #include "CoralBase/Attribute.h"
 #include "CoralBase/Exception.h"
 #include "StorageSvc/DbType.h"
-#include "SealKernel/Exception.h"
+//#include "SealKernel/Exception.h"
 #include <memory>
 #include <string>
 #include <iostream>
@@ -303,8 +303,8 @@ int main(int argc, char** argv) {
     std::cerr<<"cms::Exception "<< er.what()<<std::endl;
     delete loader;
     exit(1);
-  }catch(const seal::Exception& er){
-    std::cerr<<"seal::Exception "<< er.what()<<std::endl;
+  }catch(const pool::Exception& er){
+    std::cerr<<"pool::Exception "<< er.what()<<std::endl;
     delete loader;
     exit(1);
   }catch(...){

@@ -3,7 +3,7 @@
 #include "SealKernel/Context.h"
 #include "SealKernel/Service.h"
 #include "SealKernel/MessageStream.h"
-#include "SealKernel/Exception.h"
+//#include "SealKernel/Exception.h"
 #include "RelationalAccess/IRelationalService.h"
 #include "RelationalAccess/IRelationalDomain.h"
 #include "RelationalAccess/ISession.h"
@@ -121,13 +121,14 @@ int main(int argc, char** argv) {
   /*catch(const pool::RelationalException& er){
     std::cerr<<"caught pool::RelationalException "<<er.what()<<std::endl;
     exit(-1);
-    }*/
-  catch(const seal::Exception& er){
+    }
+    catch(const seal::Exception& er){
     std::cerr<<er.what()<<std::endl;
     if (er.code().isError()){
-      exit(er.code().code());
+    exit(er.code().code());
     }
-  }catch( std::exception& e ) {
+    }*/
+  catch( std::exception& e ) {
     std::cerr << e.what() << std::endl;
     exit(-1);
   }catch( ... ) {
