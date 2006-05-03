@@ -46,7 +46,8 @@ int main(int argc, char** argv) {
     ("container,C",boost::program_options::value<std::string>(),"payload object container name(default same as classname)")
     ("catalog,f",boost::program_options::value<std::string>(),"file catalog contact string (default $POOL_CATALOG)")
     ("appendiov,a","append new data to an existing tag(default off), not valid for infinite IOV")
-    ("infinite_iov,i","build infinite iov(default off)")
+    ("infinite_run_iov,i","build infinite iov in run(default off)")
+    ("infinite_timestamp_iov,j","build infinite iov in time(default off)")
     ("debug","print debug info (default off)")
     ("help,h", "help message")
     ;
@@ -68,6 +69,7 @@ int main(int argc, char** argv) {
   bool debug=false;
   bool infiov=false;
   bool appendiov=false;
+  unsigned long long endOfTime=0;
   //bool appendiov_check=false;
   if (vm.count("help")) {
     std::cout << visible <<std::endl;;
@@ -76,8 +78,13 @@ int main(int argc, char** argv) {
   if(vm.count("debug")) {
     debug=true;
   }
-  if(vm.count("infinite_iov")){
+  if(vm.count("infinite_run_iov") || vm.count("infinite_timestamp_iov") ){
+    if(vm.count("infinite_run_iov") && vm.count("infinite_timestamp_iov")){
+      std::cerr <<"[Error] option i and j are both given \n";
+    }
     infiov=true;
+    if( vm.count("infinite_run_iov") ) endOfTime=(unsigned long long)edm::IOVSyncValue::endOfTime().eventID().run();
+    if( vm.count("infinite_timestamp_iov") ) endOfTime=edm::IOVSyncValue::endOfTime().time().value();
   }
   if(!vm.count("connect")){
     std::cerr <<"[Error] no connect[c] option given \n";
@@ -167,7 +174,7 @@ int main(int argc, char** argv) {
     std::cout<<"\t objectname: "<<objectname<<"\n";
     std::cout<<"\t containername: "<<containername<<"\n";
     std::cout<<"\t catalog: "<<catalogname<<"\n";
-    std::cout<<"\t infinite IOV: "<<infiov<<"\n";
+    std::cout<<"\t infinite: "<<infiov<<"\n";
     std::cout<<"\t appendiov: "<<appendiov<<"\n";
     std::cout<<"\t iov_name: "<<tag<<"\n";
   }
@@ -233,8 +240,8 @@ int main(int argc, char** argv) {
       query1->addToOutputList( "TIME" );
       query1->addToOrderList( "TIME" );
     }
-    query1->defineOutputType( "IOV_VALUE_ID","unsigned long" );
-    query1->defineOutputType( "TIME","unsigned long" );
+    query1->defineOutputType( "IOV_VALUE_ID","unsigned long long" );
+    query1->defineOutputType( "TIME","unsigned long long" );
     coral::ICursor& cursor1 = query1->execute();
     //loop over iov values offsetting TIME->object by 1 place and 
     //setting the last object to have an infinite iov
@@ -245,24 +252,24 @@ int main(int argc, char** argv) {
     while( cursor1.next() ) {
       rowNum++;
       const coral::AttributeList& row = cursor1.currentRow();
-      unsigned long myl=row["IOV_VALUE_ID"].data<unsigned long>();
+      unsigned long long myl=row["IOV_VALUE_ID"].data<unsigned long long>();
       tk.resetOID(myl);
       if(!infiov){
 	if (rowNum == 1) { 
 	  lastObject = tk.tokenAsString();
 	  continue; 
 	}
-	unsigned long mytime=row["TIME"].data<unsigned long>();
+	unsigned long long mytime=row["TIME"].data<unsigned long long>();
 	myIov->iov[mytime]=lastObject;
 	lastObject=tk.tokenAsString();
       }else{
-	unsigned long mytime=(unsigned long)edm::IOVSyncValue::endOfTime().eventID().run();
+	unsigned long long mytime=endOfTime;
 	myIov->iov[mytime]=tk.tokenAsString();
       }
     }
     
     if (!infiov) {
-      unsigned long mytime=(unsigned long)edm::IOVSyncValue::endOfTime().eventID().run();
+      unsigned long long mytime=endOfTime;
       myIov->iov[mytime]=lastObject;
     }
 
