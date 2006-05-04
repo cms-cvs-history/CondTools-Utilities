@@ -1,9 +1,4 @@
-#include "PluginManager/PluginManager.h"
-#include "SealKernel/ComponentLoader.h"
-#include "SealKernel/Context.h"
-#include "SealKernel/Service.h"
-#include "SealKernel/MessageStream.h"
-//#include "SealKernel/Exception.h"
+#include "CondCore/DBCommon/interface/ServiceLoader.h"
 #include "RelationalAccess/IRelationalService.h"
 #include "RelationalAccess/IRelationalDomain.h"
 #include "RelationalAccess/ISession.h"
@@ -19,42 +14,21 @@
 #include <string>
 
 int main(int argc, char** argv) {
-   seal::PluginManager::get()->initialise();
-  seal::Context* context = new seal::Context;
-  seal::Handle<seal::ComponentLoader> loader = new seal::ComponentLoader( context );
-  loader->load( "SEAL/Services/MessageService" );
-  loader->load( "CORAL/Services/RelationalService" );
-  std::vector< seal::Handle<seal::IMessageService> > v_msgSvc;
-  context->query( v_msgSvc );
-  seal::Handle<seal::IMessageService> msgSvc;
-  if ( ! v_msgSvc.empty() ) {
-    msgSvc = v_msgSvc.front();
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Nil );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Verbose );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Debug );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Info );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Fatal );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Error );
-    msgSvc->setOutputStream( std::cerr, seal::Msg::Warning );
-  }
-  if(!::getenv( "POOL_OUTMSG_LEVEL" )){ //if not set, default to warning
-    msgSvc->setOutputLevel( seal::Msg::Error);
-  }else{
-    msgSvc->setOutputLevel( seal::Msg::Debug );
-  }
   boost::program_options::options_description desc("Allowed options");
   boost::program_options::options_description visible("Usage: remove_mapping contactstring mappingversion [-h]\n Options");
   visible.add_options()
     ("help,h", "help message")
+    ("user,u",boost::program_options::value<std::string>(),"user name (default $CORAL_AUTH_USER)")
+    ("pass,p",boost::program_options::value<std::string>(),"password (default $CORAL_AUTH_PASSWORD)")
+    ("connect,c", boost::program_options::value<std::string>(), "contact string to db(required)")
+    ("version,v", boost::program_options::value<std::string>(), "mapping version(required)")
     ;
   boost::program_options::options_description hidden(" argument");
   hidden.add_options()
-    ("contactString", boost::program_options::value<std::string>(), "contact string to db")
-    ("version", boost::program_options::value<std::string>(), "mapping version")
     ;
   desc.add(visible).add(hidden);
   boost::program_options::positional_options_description pd;
-  pd.add("contactString",1);
+  pd.add("connect",1);
   pd.add("version",2);
   boost::program_options::variables_map vm;
   try{
@@ -70,32 +44,64 @@ int main(int argc, char** argv) {
     return 0;
   }
   
-  if(!vm.count("contactString") || !vm.count("version") ){
+  if(!vm.count("connect") || !vm.count("version") ){
     std::cerr <<"[Error] no contactString or no mapping version given \n";
     std::cerr<<" please do "<<argv[0]<<" --help \n";
     return 1;
   }
   
-  std::string contact=vm["contactString"].as<std::string>();
+  std::string connect=vm["connect"].as<std::string>();
   std::string version=vm["version"].as<std::string>();
-  //std::cout<<"contactString is "<<contact<<"\n";
-  seal::IHandle<coral::IRelationalService> serviceHandle = context->query<coral::IRelationalService>( "CORAL/Services/RelationalService" );
-  if ( ! serviceHandle ) {
-    std::cerr<<"[Error] Could not retrieve the relational service"<<std::endl;
-    return 1;
+  std::string user("");
+  std::string userenv("CORAL_AUTH_USER=");
+  if(vm.count("user")){
+    user=vm["user"].as<std::string>();
+    userenv+=user;
+  }else{
+    if(!::getenv( "CORAL_AUTH_USER" )){ 
+      std::cerr <<"[Error] no user[u] option given and $CORAL_AUTH_USER is not set";
+      std::cerr<<" please do "<<argv[0]<<" --help \n";
+      return 1;
+    }
   }
-  coral::IRelationalDomain& domain = serviceHandle->domainForConnection( contact );
-  std::auto_ptr< coral::ISession > session( domain.newSession( contact ) );
-  session->connect();
-  session->transaction().start();
+  std::string pass("");
+  std::string passenv("CORAL_AUTH_PASSWORD=");
+  if(vm.count("pass")){
+    pass=vm["pass"].as<std::string>();
+    passenv+=pass;
+  }else{
+    if(!::getenv( "CORAL_AUTH_PASSWORD" )){ 
+      std::cerr <<"[Error] no pass[p] option given and $CORAL_AUTH_PASSWORD is not set\n";
+      std::cerr<<" please do "<<argv[0]<<" --help \n";
+      return 1;
+    }
+  }
+  ///
+  ///end of command parsing
+  ///
+  cond::ServiceLoader* loader=new cond::ServiceLoader;
   try{
+    loader->loadMessageService();
+    if( !user.empty() ){
+      ::putenv(const_cast<char*>(userenv.c_str()));
+    }
+    if( !pass.empty() ){
+      ::putenv(const_cast<char*>(passenv.c_str()));
+    }
+    loader->loadAuthenticationService(cond::Env);
+    coral::IRelationalService& relationalService=loader->loadRelationalService();
+    coral::IRelationalDomain& domain = relationalService.domainForConnection(connect);
+    coral::ISession* session = domain.newSession( connect );
+    session->connect();
+    session->startUserSession();
+    session->transaction().start(false);
     if( session->nominalSchema().existsTable("POOL_OR_MAPPING_VERSIONS") ) {
       coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_VERSIONS");
       coral::ITableDataEditor& dataEditor = table.dataEditor();
       coral::AttributeList inputData;
       inputData.extend( "version", typeid(std::string) );
       inputData["version"].data<std::string>()= version ;
-      dataEditor.deleteRows( "MAPPING_VERSION = :version",inputData ); 
+      dataEditor.deleteRows( "MAPPING_VERSION =:version",inputData ); 
     }
     if( session->nominalSchema().existsTable("POOL_OR_MAPPING_ELEMENTS") ) {
       coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_ELEMENTS");
@@ -103,7 +109,7 @@ int main(int argc, char** argv) {
       coral::AttributeList inputData;
       inputData.extend( "version", typeid(std::string) );
       inputData["version"].data<std::string>()=version;
-      dataEditor.deleteRows( "VERSION = :version",inputData ); 
+      dataEditor.deleteRows( "VERSION =:version",inputData ); 
     }
     if( session->nominalSchema().existsTable("POOL_OR_MAPPING_COLUMNS") ) {
       coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_COLUMNS");
@@ -111,34 +117,28 @@ int main(int argc, char** argv) {
       coral::AttributeList inputData;
       inputData.extend( "version", typeid(std::string) );
       inputData["version"].data<std::string>()=version;
-      dataEditor.deleteRows( "VERSION = :version",inputData ); 
+      dataEditor.deleteRows( "VERSION =:version",inputData ); 
     }
     if( session->nominalSchema().existsTable("POOL_RSS_CONTAINERS") ){
-      coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_COLUMNS");
+      coral::ITable& table =session->nominalSchema().tableHandle("POOL_RSS_CONTAINERS");
       coral::ITableDataEditor& dataEditor = table.dataEditor();
       coral::AttributeList inputData;
       inputData.extend( "version", typeid(std::string) );
       inputData["version"].data<std::string>()=version;
-      dataEditor.deleteRows( "MAPPING_VERSION = :version",inputData ); 
+      dataEditor.deleteRows( "MAPPING_VERSION =:version",inputData ); 
     }
-  }/*catch(const coral::RelationalException& er){
-    std::cerr<<"caught pool::RelationalException "<<er.what()<<std::endl;
-    exit(-1);
-    }
-  catch(const pool::Exception& er){
-    std::cerr<<er.what()<<std::endl;
-    exit(-1);
-    }*/catch( std::exception& e ) {
+    session->transaction().commit();
+    session->disconnect();
+    delete session;
+  }catch( std::exception& e ) {
     std::cerr << e.what() << std::endl;
     exit(-1);
   }catch( ... ) {
-    std::cerr << "Funny error" << std::endl;
-    exit(-1);
+      std::cerr << "Funny error" << std::endl;
+      exit(-1);
   }
-  session->transaction().commit();
-  session->disconnect();
-  delete context;
+  delete loader;
   return 0;
 }
-  
+
 
