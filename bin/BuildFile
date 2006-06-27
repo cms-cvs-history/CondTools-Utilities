@@ -3,7 +3,7 @@
 <use name=CondCore/IOVService>
 <use name=CondCore/MetaDataService>
 <use name=boost>
-<lib name=boost_program_options-gcc-mt> 	
+<use name=boost_program_options> 	
 <bin file=cmscond_build_iov.cpp name=cmscond_build_iov></bin>
 <bin file=cmscond_build_iov_byquery.cpp name=cmscond_build_iov_byquery></bin>
 <bin file=remove_pool_tables.cpp name=remove_pool_tables></bin>
