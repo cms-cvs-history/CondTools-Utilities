@@ -46,8 +46,9 @@ int main(int argc, char** argv) {
     ("container,C",boost::program_options::value<std::string>(),"payload object container name(default same as classname)")
     ("catalog,f",boost::program_options::value<std::string>(),"file catalog contact string (default $POOL_CATALOG)")
     ("appendiov,a","append new data to an existing tag(default off), not valid for infinite IOV")
-    ("infinite_run_iov,i","build infinite iov in run(default off)")
-    ("infinite_timestamp_iov,j","build infinite iov in time(default off)")
+    ("infinite_iov,i","build infinite iov in run(default off)")
+    ("runnumber,r","use run number type (default)")
+    ("timestamp,s","use timestamp type")
     ("debug","print debug info (default off)")
     ("help,h", "help message")
     ;
@@ -78,13 +79,15 @@ int main(int argc, char** argv) {
   if(vm.count("debug")) {
     debug=true;
   }
-  if(vm.count("infinite_run_iov") || vm.count("infinite_timestamp_iov") ){
-    if(vm.count("infinite_run_iov") && vm.count("infinite_timestamp_iov")){
-      std::cerr <<"[Error] option i and j are both given \n";
-    }
+  if(vm.count("infinite_iov") ){
     infiov=true;
-    if( vm.count("infinite_run_iov") ) endOfTime=(unsigned long long)edm::IOVSyncValue::endOfTime().eventID().run();
-    if( vm.count("infinite_timestamp_iov") ) endOfTime=edm::IOVSyncValue::endOfTime().time().value();
+  }
+  if( vm.count("runnumber") ) {
+    endOfTime=(unsigned long long)edm::IOVSyncValue::endOfTime().eventID().run();
+  }else if( vm.count("timestamp") ) {
+    endOfTime=edm::IOVSyncValue::endOfTime().time().value();
+  }else{
+    endOfTime=(unsigned long long)edm::IOVSyncValue::endOfTime().eventID().run(); //default to run number type
   }
   if(!vm.count("connect")){
     std::cerr <<"[Error] no connect[c] option given \n";
@@ -94,7 +97,7 @@ int main(int argc, char** argv) {
   if(vm.count("appendiov")){
     if(infiov){
       std::cerr<<"cannot append to infinite IOV \n";
-      return 1;
+      exit(1);
     }
     appendiov=true;
   }
@@ -177,6 +180,7 @@ int main(int argc, char** argv) {
     std::cout<<"\t infinite: "<<infiov<<"\n";
     std::cout<<"\t appendiov: "<<appendiov<<"\n";
     std::cout<<"\t iov_name: "<<tag<<"\n";
+    std::cout<<"\t end_of_time: "<<endOfTime<<"\n";
   }
   ///end of command parsing
   cond::ServiceLoader* loader=new cond::ServiceLoader;
