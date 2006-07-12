@@ -71,7 +71,6 @@ int main(int argc, char** argv) {
   bool infiov=false;
   bool appendiov=false;
   unsigned long long endOfTime=0;
-  //bool appendiov_check=false;
   if (vm.count("help")) {
     std::cout << visible <<std::endl;;
     return 0;
