@@ -49,6 +49,7 @@ int main(int argc, char** argv) {
     ("infinite_iov,i","build infinite iov in run(default off)")
     ("runnumber,r","use run number type (default)")
     ("timestamp,s","use timestamp type")
+    ("query,q",boost::program_options::value<std::string>(),"query string")
     ("debug","print debug info (default off)")
     ("help,h", "help message")
     ;
@@ -71,6 +72,7 @@ int main(int argc, char** argv) {
   bool infiov=false;
   bool appendiov=false;
   unsigned long long endOfTime=0;
+  std::string query("");
   if (vm.count("help")) {
     std::cout << visible <<std::endl;;
     return 0;
@@ -167,6 +169,9 @@ int main(int argc, char** argv) {
   }else{
     tag=vm["iov_name"].as<std::string>();
   }
+  if( vm.count("query") ){
+    query=vm["query"].as<std::string>();
+  }
   if(debug) {
     std::cout<<"\t connect: "<<connect<<"\n";
     std::cout<<"\t user: "<<user<<"\n";
@@ -180,6 +185,7 @@ int main(int argc, char** argv) {
     std::cout<<"\t appendiov: "<<appendiov<<"\n";
     std::cout<<"\t iov_name: "<<tag<<"\n";
     std::cout<<"\t end_of_time: "<<endOfTime<<"\n";
+    std::cout<<"\t query: "<<query<<"\n";
   }
   ///end of command parsing
   cond::ServiceLoader* loader=new cond::ServiceLoader;
@@ -239,6 +245,10 @@ int main(int argc, char** argv) {
     std::auto_ptr< coral::IQuery > query1( mytable.newQuery() );
     query1->setRowCacheSize( 100 );
     query1->addToOutputList( "IOV_VALUE_ID" );
+    if(!query.empty()){
+      coral::AttributeList emptydata;
+      query1->setCondition( query, emptydata );
+    }
     if(!infiov){
       query1->addToOutputList( "TIME" );
       query1->addToOrderList( "TIME" );
