@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
     ("object,o",boost::program_options::value<std::string>(),"payload object class name(required)")
     ("container,C",boost::program_options::value<std::string>(),"payload object container name(default same as classname)")
     ("catalog,f",boost::program_options::value<std::string>(),"file catalog contact string (default $POOL_CATALOG)")
-    ("appendiov,a","append new data to an existing tag(default off), not valid for infinite IOV")
+    ("appendiov,a","append new data(default off). If tag exists, append new data to it; if the tag does not exist, add data to the new tag.")
     ("infinite_iov,i","build infinite iov in run(default off)")
     ("runnumber,r","use run number type (default)")
     ("timestamp,s","use timestamp type")
@@ -225,7 +225,11 @@ int main(int argc, char** argv) {
     std::string myoldIOVtoken;
     if( appendiov ){
       meta.connect();
-      myoldIOVtoken=meta.getToken(tag);
+      if( meta.hasTag(tag) ){
+	myoldIOVtoken=meta.getToken(tag);
+      }else{
+	std::cerr<<"Warning: appending data to non-existing tag "<<tag<<std::endl;
+      }
       meta.disconnect();
     }
     //create IOV object
@@ -296,7 +300,7 @@ int main(int argc, char** argv) {
     cond::DBWriter iovwriter(poolsession,"cond::IOV");
     poolsession.startUpdateTransaction();
     std::string iovtoken=iovwriter.markWrite<cond::IOV>(myIov);
-    if( appendiov ){
+    if( appendiov && !myoldIOVtoken.empty()){
       iovwriter.markDelete<cond::IOV>(myoldIOVtoken);
     }
     poolsession.commit();
@@ -305,7 +309,7 @@ int main(int argc, char** argv) {
     
     meta.connect();
     bool result=false;
-    if( !appendiov ){
+    if( !appendiov || myoldIOVtoken.empty() ){
       result=meta.addMapping(tag,iovtoken);
     }else{
       result=meta.replaceToken(tag,iovtoken);
