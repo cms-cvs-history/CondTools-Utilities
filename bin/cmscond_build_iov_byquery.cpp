@@ -255,7 +255,7 @@ int main(int argc, char** argv) {
     //writing iov out
     cond::DBSession poolsession(connect,catalogname);
     poolsession.connect( cond::ReadWriteCreate );
-    cond::DBWriter iovwriter(poolsession,"IOV");
+    cond::DBWriter iovwriter(poolsession,"cond::IOV");
     poolsession.startUpdateTransaction();
     std::string iovtoken=iovwriter.markWrite<cond::IOV>(myIov);
     poolsession.commit();
