@@ -94,9 +94,13 @@ int main( int argc, char** argv ){
       cond::IOVIterator* ioviterator=iovservice.newIOVIterator(token);
       session.connect();
       session.startReadOnlyTransaction();
+      unsigned int counter=0;
+      std::cout<<"Tag "<<tag<<"\n since \t till"<<std::endl;
       while( ioviterator->next() ){
-	std::cout<<ioviterator->validity().first<<" "<<ioviterator->validity().second<<std::endl;	
+	std::cout<<ioviterator->validity().first<<" \t "<<ioviterator->validity().second<<std::endl;	
+	++counter;
       }
+      std::cout<<"Total # of payload objects: "<<counter<<std::endl;
       session.commit();
       session.disconnect();
       delete ioviterator;
