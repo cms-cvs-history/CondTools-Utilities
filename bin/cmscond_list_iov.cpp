@@ -86,13 +86,13 @@ int main( int argc, char** argv ){
     try{
       cond::MetaData metadata_svc(connect, *loader);
       std::string token;
-      metadata_svc.connect();
+      metadata_svc.connect(cond::ReadOnly);
       token=metadata_svc.getToken(tag);
       metadata_svc.disconnect();
       cond::DBSession session(connect,catalog);
       cond::IOVService iovservice(session);
       cond::IOVIterator* ioviterator=iovservice.newIOVIterator(token);
-      session.connect();
+      session.connect(cond::ReadOnly);
       session.startReadOnlyTransaction();
       unsigned int counter=0;
       std::string payloadContainer=iovservice.payloadContainerName(token);
