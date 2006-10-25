@@ -67,7 +67,7 @@ int main( int argc, char** argv ){
     try{
       cond::MetaData metadata_svc(connect, *loader);
       std::vector<std::string> alltags;
-      metadata_svc.connect();
+      metadata_svc.connect(cond::ReadOnly);
       metadata_svc.listAllTags(alltags);
       std::copy (alltags.begin(),
 		 alltags.end(),
