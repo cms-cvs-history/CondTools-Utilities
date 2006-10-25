@@ -7,3 +7,4 @@
 <bin file=remove_pool_tables.cpp name=remove_pool_tables></bin>
 <bin file=remove_mapping.cpp name=remove_mapping></bin>
 <bin file=cmscond_list_iov.cpp name=cmscond_list_iov></bin>
+<bin file=cmscond_delete_iov.cpp name=cmscond_delete_iov></bin>
