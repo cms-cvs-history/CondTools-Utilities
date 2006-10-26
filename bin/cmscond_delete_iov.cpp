@@ -14,7 +14,7 @@ int main( int argc, char** argv ){
     ("pass,p",boost::program_options::value<std::string>(),"password (default \"\")")
     ("catalog,f",boost::program_options::value<std::string>(),"file catalog contact string (default $POOL_CATALOG)")
     ("all,a","delete all tags")
-    ("tag,t",boost::program_options::value<std::string>(),"list info of the specified tag")
+    ("tag,t",boost::program_options::value<std::string>(),"delete the specified tag and IOV")
     ("help,h", "help message")
     ;
   desc.add(visible);
