@@ -47,7 +47,7 @@ public:
     m_context( new seal::Context)
   {
     seal::PluginManager::get()->initialise();
-    seal::Handle<seal::ComponentLoader> loader = new seal::ComponentLoader( m_context );
+    seal::Handle<seal::ComponentLoader> loader = new seal::ComponentLoader( m_context.get() );
 
      loader->load( "SEAL/Services/MessageService" );
     std::vector< seal::Handle<seal::IMessageService> > v_msgSvc;
@@ -95,7 +95,6 @@ public:
   ~CondDBApp() 
   {
     m_session->disconnect();
-    delete m_context;
   }
 
   void getTokens()
@@ -123,7 +122,7 @@ public:
 
 
 private:
-  seal::Context* m_context;
+  seal::Handle< seal::Context > m_context;
   std::auto_ptr<coral::ISession> m_session;
 };
 

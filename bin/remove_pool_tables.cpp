@@ -20,8 +20,8 @@
 
 int main(int argc, char** argv) {
   seal::PluginManager::get()->initialise();
-  seal::Context* context = new seal::Context;
-  seal::Handle<seal::ComponentLoader> loader = new seal::ComponentLoader( context );
+  seal::Handle< seal::Context > context = new seal::Context;
+  seal::Handle<seal::ComponentLoader> loader = new seal::ComponentLoader( context.get() );
   loader->load( "SEAL/Services/MessageService" );
   loader->load( "CORAL/Services/RelationalService" );
   std::vector< seal::Handle<seal::IMessageService> > v_msgSvc;
@@ -137,7 +137,6 @@ int main(int argc, char** argv) {
     }
   session->transaction().commit();
   session->disconnect();
-  delete context;
   return 0;
 }
   
