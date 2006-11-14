@@ -1,10 +1,16 @@
-#include "CondCore/DBCommon/interface/ServiceLoader.h"
+#include "CondCore/DBCommon/interface/RelationalStorageManager.h"
+#include "CondCore/DBCommon/interface/PoolStorageManager.h"
+#include "CondCore/DBCommon/interface/AuthenticationMethod.h"
+#include "CondCore/DBCommon/interface/SessionConfiguration.h"
+#include "CondCore/DBCommon/interface/ConnectionConfiguration.h"
+#include "CondCore/DBCommon/interface/MessageLevel.h"
 #include "CondCore/DBCommon/interface/DBSession.h"
 #include "CondCore/DBCommon/interface/Exception.h"
 #include "CondCore/MetaDataService/interface/MetaData.h"
 #include "CondCore/IOVService/interface/IOVService.h"
 #include "CondCore/IOVService/interface/IOVEditor.h"
 #include <boost/program_options.hpp>
+#include <iostream>
 int main( int argc, char** argv ){
   boost::program_options::options_description desc("options");
   boost::program_options::options_description visible("Usage: cmscond_delete_iov [options] \n");
@@ -15,6 +21,7 @@ int main( int argc, char** argv ){
     ("catalog,f",boost::program_options::value<std::string>(),"file catalog contact string (default $POOL_CATALOG)")
     ("all,a","delete all tags")
     ("tag,t",boost::program_options::value<std::string>(),"delete the specified tag and IOV")
+    ("debug,d","switch on debug mode")
     ("help,h", "help message")
     ;
   desc.add(visible);
@@ -35,6 +42,7 @@ int main( int argc, char** argv ){
   std::string user("");
   std::string pass("");
   bool deleteAll=true;
+  bool debug=false;
   std::string tag;
   if(!vm.count("connect")){
     std::cerr <<"[Error] no connect[c] option given \n";
@@ -56,26 +64,41 @@ int main( int argc, char** argv ){
     tag=vm["tag"].as<std::string>();
     deleteAll=false;
   }
-  cond::ServiceLoader* loader=new cond::ServiceLoader;
+  if(vm.count("debug")){
+    debug=true;
+  }
+  cond::DBSession* session=new cond::DBSession(connect);
+  session->sessionConfiguration().setAuthenticationMethod( cond::Env );
+  if(debug){
+    session->sessionConfiguration().setMessageLevel( cond::Debug );
+  }else{
+    session->sessionConfiguration().setMessageLevel( cond::Error );
+  }
+  session->connectionConfiguration().setConnectionRetrialTimeOut( 600 );
+  session->connectionConfiguration().enableConnectionSharing();
+  session->connectionConfiguration().enableReadOnlySessionOnUpdateConnections(); 
   std::string userenv(std::string("CORAL_AUTH_USER=")+user);
   std::string passenv(std::string("CORAL_AUTH_PASSWORD=")+pass);
   ::putenv(const_cast<char*>(userenv.c_str()));
   ::putenv(const_cast<char*>(passenv.c_str()));
-  loader->loadAuthenticationService(cond::Env);
-  loader->loadMessageService(cond::Error);
   if( deleteAll ){
     try{
-      cond::DBSession session(connect,catalog);
-      cond::IOVService iovservice(session);
-      session.connect(cond::ReadWrite);
-      session.startUpdateTransaction();
+      session->open(true);
+      cond::PoolStorageManager& pooldb=session->poolStorageManager(catalog);
+      cond::IOVService iovservice(pooldb);
+      pooldb.connect(cond::ReadWrite);
+      pooldb.startTransaction(false);
       iovservice.deleteAll();
-      session.commit();
-      session.disconnect();
-      cond::MetaData metadata_svc(connect, *loader);
-      metadata_svc.connect(cond::ReadWrite);
+      pooldb.commit();
+      pooldb.disconnect();
+      cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+      cond::MetaData metadata_svc(coraldb);
+      coraldb.connect(cond::ReadWrite);
+      coraldb.startTransaction(false);
       metadata_svc.deleteAllEntries();
-      metadata_svc.disconnect();
+      coraldb.commit();
+      coraldb.disconnect();
+      session->close();
       return 0;
     }catch(cond::Exception& er){
       std::cout<<er.what()<<std::endl;
@@ -86,24 +109,33 @@ int main( int argc, char** argv ){
     }
   }else{
     try{
-      cond::MetaData metadata_svc(connect, *loader);
-      metadata_svc.connect(cond::ReadWrite);
+      session->open(true);
+      cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+      cond::MetaData metadata_svc(coraldb);
+      coraldb.connect(cond::ReadOnly);
+      coraldb.startTransaction(true);
       std::string token=metadata_svc.getToken(tag);
       if( token.empty() ) {
 	std::cout<<"non-existing tag "<<tag<<std::endl;
 	return 11;
       }
-      cond::DBSession session(connect,catalog);
-      cond::IOVService iovservice(session);
+      coraldb.commit();
+      coraldb.disconnect();
+      cond::PoolStorageManager& pooldb=session->poolStorageManager(catalog);
+      cond::IOVService iovservice(pooldb);
       cond::IOVEditor* ioveditor=iovservice.newIOVEditor(token);
-      session.connect(cond::ReadWrite);
-      session.startUpdateTransaction();
+      pooldb.connect(cond::ReadWrite);
+      pooldb.startTransaction(false);
       ioveditor->deleteEntries();
-      session.commit();
-      session.disconnect();
+      pooldb.commit();
+      pooldb.disconnect();
+      coraldb.connect(cond::ReadWrite);
+      coraldb.startTransaction(false);
       metadata_svc.deleteEntryByTag(tag);
-      metadata_svc.disconnect();
+      coraldb.commit();
+      coraldb.disconnect();
       delete ioveditor;
+      session->close();
     }catch(cond::Exception& er){
       std::cout<<er.what()<<std::endl;
     }catch(std::exception& er){
@@ -112,6 +144,6 @@ int main( int argc, char** argv ){
       std::cout<<"Unknown error"<<std::endl;
     }
   }
-  delete loader;
+  delete session;
   return 0;
 }
