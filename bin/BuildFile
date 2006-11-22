@@ -8,5 +8,5 @@
 <bin file=remove_pool_tables.cpp name=remove_pool_tables></bin>
 <bin file=remove_mapping.cpp name=remove_mapping></bin>
 <bin file=cmscalib_list_tag_name.cpp>
-    <use name=CORALRelationalAccess>
+    <use name=RelationalAccess>
 </bin>
