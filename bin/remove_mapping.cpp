@@ -1,39 +1,37 @@
-#include "CondCore/DBCommon/interface/ServiceLoader.h"
-#include "RelationalAccess/IRelationalService.h"
-#include "RelationalAccess/IRelationalDomain.h"
-#include "RelationalAccess/ISession.h"
-#include "RelationalAccess/ITransaction.h"
+#include "CondCore/DBCommon/interface/Exception.h"
+#include "CondCore/DBCommon/interface/RelationalStorageManager.h"
+#include "CondCore/DBCommon/interface/DBSession.h"
+#include "CondCore/DBCommon/interface/MessageLevel.h"
+#include "CondCore/DBCommon/interface/AuthenticationMethod.h"
+#include "CondCore/DBCommon/interface/ConnectionConfiguration.h"
+#include "CondCore/DBCommon/interface/SessionConfiguration.h"
+
+#include "RelationalAccess/ISessionProxy.h"
 #include "RelationalAccess/ISchema.h"
 #include "RelationalAccess/ITable.h"
-#include "CoralBase/AttributeList.h"
-#include "CoralBase/AttributeSpecification.h"
-#include "CoralBase/Attribute.h"
 #include "RelationalAccess/ITableDataEditor.h"
+#include "CoralBase/AttributeList.h"
+#include "CoralBase/Attribute.h"
+
 #include <boost/program_options.hpp>
 #include <stdexcept>
 #include <string>
-
+#include <iostream>
 int main(int argc, char** argv) {
   boost::program_options::options_description desc("Allowed options");
   boost::program_options::options_description visible("Usage: remove_mapping contactstring mappingversion [-h]\n Options");
   visible.add_options()
-    ("help,h", "help message")
-    ("user,u",boost::program_options::value<std::string>(),"user name (default $CORAL_AUTH_USER)")
-    ("pass,p",boost::program_options::value<std::string>(),"password (default $CORAL_AUTH_PASSWORD)")
     ("connect,c", boost::program_options::value<std::string>(), "contact string to db(required)")
+    ("user,u",boost::program_options::value<std::string>(),"user name (default \"\")")
+    ("pass,p",boost::program_options::value<std::string>(),"password (default \"\")")
     ("version,v", boost::program_options::value<std::string>(), "mapping version(required)")
+    ("debug,d","switch on debug mode")
+    ("help,h", "help message")
     ;
-  boost::program_options::options_description hidden(" argument");
-  hidden.add_options()
-    ;
-  desc.add(visible).add(hidden);
-  boost::program_options::positional_options_description pd;
-  pd.add("connect",1);
-  pd.add("version",2);
+  desc.add(visible);
   boost::program_options::variables_map vm;
   try{
-    boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).positional(pd).run(), vm);
-    
+    boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).run(), vm);    
     boost::program_options::notify(vm);
   }catch(const boost::program_options::error& er) {
     std::cerr << er.what()<<std::endl;
@@ -49,86 +47,78 @@ int main(int argc, char** argv) {
     std::cerr<<" please do "<<argv[0]<<" --help \n";
     return 1;
   }
-  
+
   std::string connect=vm["connect"].as<std::string>();
   std::string version=vm["version"].as<std::string>();
   std::string user("");
-  std::string userenv("CORAL_AUTH_USER=");
+  std::string pass("");
+  bool debug=false;
   if(vm.count("user")){
     user=vm["user"].as<std::string>();
-    userenv+=user;
-  }else{
-    if(!::getenv( "CORAL_AUTH_USER" )){ 
-      std::cerr <<"[Error] no user[u] option given and $CORAL_AUTH_USER is not set";
-      std::cerr<<" please do "<<argv[0]<<" --help \n";
-      return 1;
-    }
   }
-  std::string pass("");
-  std::string passenv("CORAL_AUTH_PASSWORD=");
   if(vm.count("pass")){
     pass=vm["pass"].as<std::string>();
-    passenv+=pass;
-  }else{
-    if(!::getenv( "CORAL_AUTH_PASSWORD" )){ 
-      std::cerr <<"[Error] no pass[p] option given and $CORAL_AUTH_PASSWORD is not set\n";
-      std::cerr<<" please do "<<argv[0]<<" --help \n";
-      return 1;
-    }
+  }
+  if(vm.count("debug")){
+    debug=true;
   }
   ///
   ///end of command parsing
   ///
-  cond::ServiceLoader* loader=new cond::ServiceLoader;
   try{
-    loader->loadMessageService();
-    if( !user.empty() ){
-      ::putenv(const_cast<char*>(userenv.c_str()));
+    cond::DBSession* session=new cond::DBSession(connect);
+    session->sessionConfiguration().setAuthenticationMethod( cond::Env );
+    if(debug){
+      session->sessionConfiguration().setMessageLevel( cond::Debug );
+    }else{
+      session->sessionConfiguration().setMessageLevel( cond::Error );
     }
-    if( !pass.empty() ){
-      ::putenv(const_cast<char*>(passenv.c_str()));
-    }
-    loader->loadAuthenticationService(cond::Env);
-    coral::IRelationalService& relationalService=loader->loadRelationalService();
-    coral::IRelationalDomain& domain = relationalService.domainForConnection(connect);
-    coral::ISession* session = domain.newSession( connect );
-    session->connect();
-    session->startUserSession();
-    session->transaction().start(false);
-    if( session->nominalSchema().existsTable("POOL_OR_MAPPING_VERSIONS") ) {
-      coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_VERSIONS");
+    session->connectionConfiguration().setConnectionRetrialTimeOut( 600 );
+    session->connectionConfiguration().enableConnectionSharing();
+    session->connectionConfiguration().enableReadOnlySessionOnUpdateConnections();  
+    std::string userenv(std::string("CORAL_AUTH_USER=")+user);
+    std::string passenv(std::string("CORAL_AUTH_PASSWORD=")+pass);
+    ::putenv(const_cast<char*>(userenv.c_str()));
+    ::putenv(const_cast<char*>(passenv.c_str()));
+    session->open(true);
+    cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+    coraldb.connect(cond::ReadWriteCreate);
+    coraldb.startTransaction(false);
+    if( coraldb.sessionProxy().nominalSchema().existsTable("POOL_OR_MAPPING_VERSIONS") ) {
+      coral::ITable& table=coraldb.sessionProxy().nominalSchema().tableHandle("POOL_OR_MAPPING_VERSIONS");
       coral::ITableDataEditor& dataEditor = table.dataEditor();
       coral::AttributeList inputData;
       inputData.extend( "version", typeid(std::string) );
       inputData["version"].data<std::string>()= version ;
       dataEditor.deleteRows( "MAPPING_VERSION =:version",inputData ); 
     }
-    if( session->nominalSchema().existsTable("POOL_OR_MAPPING_ELEMENTS") ) {
-      coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_ELEMENTS");
+    if( coraldb.sessionProxy().nominalSchema().existsTable("POOL_OR_MAPPING_ELEMENTS") ) {
+      coral::ITable& table=coraldb.sessionProxy().nominalSchema().tableHandle("POOL_OR_MAPPING_ELEMENTS");
       coral::ITableDataEditor& dataEditor = table.dataEditor();
       coral::AttributeList inputData;
       inputData.extend( "version", typeid(std::string) );
       inputData["version"].data<std::string>()=version;
       dataEditor.deleteRows( "VERSION =:version",inputData ); 
     }
-    if( session->nominalSchema().existsTable("POOL_OR_MAPPING_COLUMNS") ) {
-      coral::ITable& table =session->nominalSchema().tableHandle("POOL_OR_MAPPING_COLUMNS");
+    if( coraldb.sessionProxy().nominalSchema().existsTable("POOL_OR_MAPPING_COLUMNS") ) {
+      coral::ITable& table=coraldb.sessionProxy().nominalSchema().tableHandle("POOL_OR_MAPPING_COLUMNS");
       coral::ITableDataEditor& dataEditor = table.dataEditor();
       coral::AttributeList inputData;
       inputData.extend( "version", typeid(std::string) );
       inputData["version"].data<std::string>()=version;
       dataEditor.deleteRows( "VERSION =:version",inputData ); 
     }
-    if( session->nominalSchema().existsTable("POOL_RSS_CONTAINERS") ){
-      coral::ITable& table =session->nominalSchema().tableHandle("POOL_RSS_CONTAINERS");
+    if(coraldb.sessionProxy().nominalSchema().existsTable("POOL_RSS_CONTAINERS") ){
+      coral::ITable& table=coraldb.sessionProxy().nominalSchema().tableHandle("POOL_RSS_CONTAINERS");
       coral::ITableDataEditor& dataEditor = table.dataEditor();
       coral::AttributeList inputData;
       inputData.extend( "version", typeid(std::string) );
       inputData["version"].data<std::string>()=version;
       dataEditor.deleteRows( "MAPPING_VERSION =:version",inputData ); 
     }
-    session->transaction().commit();
-    session->disconnect();
+    coraldb.commit();
+    coraldb.disconnect();
+    session->close();
     delete session;
   }catch( std::exception& e ) {
     std::cerr << e.what() << std::endl;
@@ -137,7 +127,6 @@ int main(int argc, char** argv) {
       std::cerr << "Funny error" << std::endl;
       exit(-1);
   }
-  delete loader;
   return 0;
 }
 
