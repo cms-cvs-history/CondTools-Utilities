@@ -1,21 +1,24 @@
 //#include "CondCore/DBCommon/interface/CommandLine.h"
-#include "CondCore/DBCommon/interface/ServiceLoader.h"
+#include "CondCore/DBCommon/interface/RelationalStorageManager.h"
+#include "CondCore/DBCommon/interface/PoolStorageManager.h"
+#include "CondCore/DBCommon/interface/AuthenticationMethod.h"
+#include "CondCore/DBCommon/interface/SessionConfiguration.h"
+#include "CondCore/DBCommon/interface/ConnectionConfiguration.h"
+#include "CondCore/DBCommon/interface/MessageLevel.h"
+#include "CondCore/DBCommon/interface/DBSession.h"
+#include "CondCore/DBCommon/interface/Time.h"
+#include "CondCore/DBCommon/interface/Exception.h"
 #include "CondCore/DBCommon/interface/TokenBuilder.h"
 #include "CondCore/DBCommon/interface/DBSession.h"
-#include "CondCore/DBCommon/interface/DBWriter.h"
-#include "CondCore/DBCommon/interface/Exception.h"
+#include "CondCore/IOVService/interface/IOVService.h"
+#include "CondCore/IOVService/interface/IOVEditor.h"
 #include "CondCore/MetaDataService/interface/MetaData.h"
-#include "CondCore/IOVService/interface/IOV.h"
 #include "FWCore/Framework/interface/IOVSyncValue.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "FileCatalog/IFileCatalog.h"
 #include "FileCatalog/URIParser.h"
 #include "FileCatalog/IFCAction.h"
-#include "RelationalAccess/RelationalServiceException.h"
-#include "RelationalAccess/IRelationalService.h"
-#include "RelationalAccess/IRelationalDomain.h"
-#include "RelationalAccess/ISession.h"
-#include "RelationalAccess/ITransaction.h"
+#include "RelationalAccess/ISessionProxy.h"
 #include "RelationalAccess/ISchema.h"
 #include "RelationalAccess/ITable.h"
 #include "RelationalAccess/ITableDataEditor.h"
@@ -68,10 +71,12 @@ int main(int argc, char** argv) {
     std::cerr << er.what()<<std::endl;
     return 1;
   }
+  std::string user("");
+  std::string pass("");
   bool debug=false;
   bool infiov=false;
   bool appendiov=false;
-  unsigned long long endOfTime=0;
+  cond::Time_t endOfTime=0;
   std::string query("");
   if (vm.count("help")) {
     std::cout << visible <<std::endl;;
@@ -84,11 +89,11 @@ int main(int argc, char** argv) {
     infiov=true;
   }
   if( vm.count("runnumber") ) {
-    endOfTime=(unsigned long long)edm::IOVSyncValue::endOfTime().eventID().run();
+    endOfTime=(cond::Time_t)edm::IOVSyncValue::endOfTime().eventID().run();
   }else if( vm.count("timestamp") ) {
     endOfTime=edm::IOVSyncValue::endOfTime().time().value();
   }else{
-    endOfTime=(unsigned long long)edm::IOVSyncValue::endOfTime().eventID().run(); //default to run number type
+    endOfTime=(cond::Time_t)edm::IOVSyncValue::endOfTime().eventID().run(); //default to run number type
   }
   if(!vm.count("connect")){
     std::cerr <<"[Error] no connect[c] option given \n";
@@ -102,30 +107,12 @@ int main(int argc, char** argv) {
     }
     appendiov=true;
   }
-  std::string user("");
-  std::string userenv("CORAL_AUTH_USER=");
   std::string connect=vm["connect"].as<std::string>();
   if(vm.count("user")){
     user=vm["user"].as<std::string>();
-    userenv+=user;
-  }else{
-    if(!::getenv( "CORAL_AUTH_USER" )){ 
-      std::cerr <<"[Error] no user[u] option given and $CORAL_AUTH_USER is not set";
-      std::cerr<<" please do "<<argv[0]<<" --help \n";
-      return 1;
-    }
   }
-  std::string pass("");
-  std::string passenv("CORAL_AUTH_PASSWORD=");
   if(vm.count("pass")){
     pass=vm["pass"].as<std::string>();
-    passenv+=pass;
-  }else{
-    if(!::getenv( "CORAL_AUTH_PASSWORD" )){ 
-      std::cerr <<"[Error] no pass[p] option given and $CORAL_AUTH_PASSWORD is not set\n";
-      std::cerr<<" please do "<<argv[0]<<" --help \n";
-      return 1;
-    }
   }
   if(!vm.count("dictionary")){
     std::cerr <<"[Error] no dictionary[d] option given \n";
@@ -151,14 +138,8 @@ int main(int argc, char** argv) {
   }else{
     containername=vm["container"].as<std::string>();
   }
-  std::string catalogname;
-  if( !vm.count("catalog") ){
-    if(!::getenv("POOL_CATALOG")){
-      catalogname="file:PoolFileCatalog.xml";
-    }else{
-      catalogname=std::string(::getenv("POOL_CATALOG"));
-    }
-  }else{
+  std::string catalogname("file:PoolFileCatalog.xml");
+  if(vm.count("catalog")){
     catalogname=vm["catalog"].as<std::string>();
   }
   std::string tag;
@@ -188,20 +169,23 @@ int main(int argc, char** argv) {
     std::cout<<"\t query: "<<query<<"\n";
   }
   ///end of command parsing
-  cond::ServiceLoader* loader=new cond::ServiceLoader;
   try{
-    if(debug) {
-      loader->loadMessageService(cond::Debug);
+    cond::DBSession* session=new cond::DBSession(connect);
+    session->sessionConfiguration().setAuthenticationMethod( cond::Env );
+    if(debug){
+      session->sessionConfiguration().setMessageLevel( cond::Debug );
     }else{
-      loader->loadMessageService();
+      session->sessionConfiguration().setMessageLevel( cond::Error );
     }
-    if( !user.empty() ){
-      ::putenv(const_cast<char*>(userenv.c_str()));
-    }
-    if( !pass.empty() ){
-      ::putenv(const_cast<char*>(passenv.c_str()));
-    }
-    loader->loadAuthenticationService(cond::Env);
+    session->connectionConfiguration().setConnectionRetrialTimeOut( 600 );
+    session->connectionConfiguration().enableConnectionSharing();
+    session->connectionConfiguration().enableReadOnlySessionOnUpdateConnections();
+    std::string userenv(std::string("CORAL_AUTH_USER=")+user);
+    std::string passenv(std::string("CORAL_AUTH_PASSWORD=")+pass);
+    ::putenv(const_cast<char*>(userenv.c_str()));
+    ::putenv(const_cast<char*>(passenv.c_str()));
+
+    session->open(true);
     std::auto_ptr<pool::IFileCatalog> mycatalog(new pool::IFileCatalog);
     mycatalog->addReadCatalog(catalogname);
     pool::FClookup l;
@@ -220,31 +204,25 @@ int main(int argc, char** argv) {
     }
     mycatalog->commit();  
     mycatalog->disconnect();
-
-    cond::MetaData meta(connect,*loader);
-    std::string myoldIOVtoken;
+    cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+    cond::MetaData meta(coraldb);
+    std::string iovtoken("");
     if( appendiov ){
-      meta.connect();
+      coraldb.connect(cond::ReadOnly);
+      coraldb.startTransaction(true);
       if( meta.hasTag(tag) ){
-	myoldIOVtoken=meta.getToken(tag);
+	iovtoken=meta.getToken(tag);
       }else{
 	std::cerr<<"Warning: appending data to non-existing tag "<<tag<<std::endl;
       }
-      meta.disconnect();
+      coraldb.commit();
+      coraldb.disconnect();
     }
-    //create IOV object
-    cond::IOV* myIov=new cond::IOV;
-    //prepare tokenBuilder
     cond::TokenBuilder tk;
-    tk.set(fid, dictionary, objectname, containername );
-    
-    coral::IRelationalService& relationalService=loader->loadRelationalService();
-    coral::IRelationalDomain& domain = relationalService.domainForConnection(connect);
-    coral::ISession* coralsession = domain.newSession( connect );
-    coralsession->connect();
-    coralsession->startUserSession();
-    coralsession->transaction().start();
-    coral::ITable& mytable=coralsession->nominalSchema().tableHandle(table);
+    tk.set(fid, dictionary, objectname, containername );    
+    coraldb.connect(cond::ReadOnly);
+    coraldb.startTransaction(true);
+    coral::ITable& mytable=coraldb.sessionProxy().nominalSchema().tableHandle(table);
     //std::cout<< "Querying : SELECT IOV_VALUE_ID, TIME FROM "<<tabName<<std::endl;
     std::auto_ptr< coral::IQuery > query1( mytable.newQuery() );
     query1->setRowCacheSize( 100 );
@@ -257,86 +235,74 @@ int main(int argc, char** argv) {
       query1->addToOutputList( "TIME" );
       query1->addToOrderList( "TIME" );
     }
-    query1->defineOutputType( "IOV_VALUE_ID","unsigned long long" );
+    query1->defineOutputType( "IOV_VALUE_ID","int" );
     query1->defineOutputType( "TIME","unsigned long long" );
     coral::ICursor& cursor1 = query1->execute();
     //loop over iov values offsetting TIME->object by 1 place and 
     //setting the last object to have an infinite iov
-
+    std::string previousPayloadToken;
     int rowNum = 0;
     std::string lastObject = "";
-
+    std::vector< std::pair< cond::Time_t,std::string > > toPut;
     while( cursor1.next() ) {
       rowNum++;
       const coral::AttributeList& row = cursor1.currentRow();
-      unsigned long long myl=row["IOV_VALUE_ID"].data<unsigned long long>();
+      int myl=row["IOV_VALUE_ID"].data<int>();
       tk.resetOID(myl);
       if(!infiov){
 	if (rowNum == 1) { 
-	  lastObject = tk.tokenAsString();
+	  //pass the first since Time
+	  previousPayloadToken = tk.tokenAsString();
 	  continue; 
 	}
-	unsigned long long mytime=row["TIME"].data<unsigned long long>();
-	myIov->iov[mytime]=lastObject;
-	lastObject=tk.tokenAsString();
+	cond::Time_t mytime=row["TIME"].data<cond::Time_t>();
+	toPut.push_back( std::make_pair<cond::Time_t,std::string>(mytime,previousPayloadToken));
+	//myIov->iov[mytime]=lastObject;
+	previousPayloadToken=tk.tokenAsString();
       }else{
-	unsigned long long mytime=endOfTime;
-	myIov->iov[mytime]=tk.tokenAsString();
+	cond::Time_t mytime=endOfTime;
+	//myIov->iov[mytime]=tk.tokenAsString();
+	toPut.push_back( std::make_pair<cond::Time_t,std::string>(mytime,tk.tokenAsString()));
       }
     }
-    
+    //
+    //the very last one
+    //
     if (!infiov) {
-      unsigned long long mytime=endOfTime;
-      myIov->iov[mytime]=lastObject;
+      cond::Time_t mytime=endOfTime;
+      //myIov->iov[mytime]=lastObject;
+      toPut.push_back( std::make_pair<cond::Time_t,std::string>(mytime,previousPayloadToken));
     }
-
-    coralsession->transaction().commit();    
-    coralsession->disconnect();
-    delete coralsession;
+    coraldb.commit();
+    coraldb.disconnect();
 
     //writing iov out
-    cond::DBSession poolsession(connect,catalogname);
-    poolsession.connect( cond::ReadWriteCreate );
-    cond::DBWriter iovwriter(poolsession,"cond::IOV");
-    poolsession.startUpdateTransaction();
-    std::string iovtoken=iovwriter.markWrite<cond::IOV>(myIov);
-    if( appendiov && !myoldIOVtoken.empty()){
-      iovwriter.markDelete<cond::IOV>(myoldIOVtoken);
-    }
-    poolsession.commit();
-    poolsession.disconnect();
+    cond::PoolStorageManager& pooldb=session->poolStorageManager(catalogname);
+    cond::IOVService iovservice(pooldb);
+    cond::IOVEditor* iovEditor=iovservice.newIOVEditor(iovtoken);
+    pooldb.connect(cond::ReadWriteCreate);
+    pooldb.startTransaction(false);
+    iovEditor->bulkInsert(toPut);
+    pooldb.commit();
+    pooldb.disconnect();
+    delete iovEditor;
     if(debug) std::cout<<tag<<" "<<iovtoken<<std::endl;
-    
-    meta.connect();
-    bool result=false;
-    if( !appendiov || myoldIOVtoken.empty() ){
-      result=meta.addMapping(tag,iovtoken);
-    }else{
-      result=meta.replaceToken(tag,iovtoken);
+    if( !appendiov ){
+      coraldb.connect( cond::ReadWriteCreate );
+      coraldb.startTransaction(false);
+      meta.addMapping(tag,iovtoken);
+      coraldb.commit();
+      coraldb.disconnect();
     }
-    if(!result){
-      std::cerr<< "Error: failed to tag token "<<iovtoken<<std::endl;
-      exit(1);
-    }
-    meta.disconnect();
+    session->close();
+    delete session;
   }catch(const cond::Exception& er){
     std::cerr<<"cond::Exception "<< er.what()<<std::endl;
-    delete loader;
     exit(1);
   }catch(const cms::Exception& er){
     std::cerr<<"cms::Exception "<< er.what()<<std::endl;
-    delete loader;
-    exit(1);
-  }catch(const pool::Exception& er){
-    std::cerr<<"pool::Exception "<< er.what()<<std::endl;
-    delete loader;
-    exit(1);
-  }catch(...){
-    std::cerr<<"Unknown error "<<std::endl;
-    delete loader;
     exit(1);
   }
-  delete loader;
   return 0;
 }
 
