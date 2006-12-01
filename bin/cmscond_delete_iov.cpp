@@ -86,7 +86,7 @@ int main( int argc, char** argv ){
       session->open(true);
       cond::PoolStorageManager& pooldb=session->poolStorageManager(catalog);
       cond::IOVService iovservice(pooldb);
-      pooldb.connect(cond::ReadWrite);
+      pooldb.connect();
       pooldb.startTransaction(false);
       iovservice.deleteAll();
       pooldb.commit();
@@ -124,7 +124,7 @@ int main( int argc, char** argv ){
       cond::PoolStorageManager& pooldb=session->poolStorageManager(catalog);
       cond::IOVService iovservice(pooldb);
       cond::IOVEditor* ioveditor=iovservice.newIOVEditor(token);
-      pooldb.connect(cond::ReadWrite);
+      pooldb.connect();
       pooldb.startTransaction(false);
       ioveditor->deleteEntries();
       pooldb.commit();

@@ -118,7 +118,7 @@ int main( int argc, char** argv ){
       cond::PoolStorageManager& pooldb=session->poolStorageManager(catalog);
       cond::IOVService iovservice(pooldb);
       cond::IOVIterator* ioviterator=iovservice.newIOVIterator(token);
-      pooldb.connect(cond::ReadOnly);
+      pooldb.connect();
       pooldb.startTransaction(true);
       unsigned int counter=0;
       std::string payloadContainer=iovservice.payloadContainerName(token);

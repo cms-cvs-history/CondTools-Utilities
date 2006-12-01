@@ -280,7 +280,7 @@ int main(int argc, char** argv) {
     cond::PoolStorageManager& pooldb=session->poolStorageManager(catalogname);
     cond::IOVService iovservice(pooldb);
     cond::IOVEditor* iovEditor=iovservice.newIOVEditor(iovtoken);
-    pooldb.connect(cond::ReadWriteCreate);
+    pooldb.connect();
     pooldb.startTransaction(false);
     iovEditor->bulkInsert(toPut);
     pooldb.commit();
