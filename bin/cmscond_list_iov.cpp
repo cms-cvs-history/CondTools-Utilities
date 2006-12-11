@@ -1,4 +1,5 @@
 #include "CondCore/DBCommon/interface/RelationalStorageManager.h"
+#include "CondCore/DBCommon/interface/PoolStorageManager.h"
 #include "CondCore/DBCommon/interface/AuthenticationMethod.h"
 #include "CondCore/DBCommon/interface/SessionConfiguration.h"
 #include "CondCore/DBCommon/interface/ConnectionConfiguration.h"
@@ -10,6 +11,7 @@
 #include "CondCore/IOVService/interface/IOVIterator.h"
 #include <boost/program_options.hpp>
 #include <iterator>
+#include <iostream>
 int main( int argc, char** argv ){
   boost::program_options::options_description desc("options");
   boost::program_options::options_description visible("Usage: cmscond_list_iov [options] \n");
