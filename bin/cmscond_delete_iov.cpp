@@ -67,7 +67,7 @@ int main( int argc, char** argv ){
   if(vm.count("debug")){
     debug=true;
   }
-  cond::DBSession* session=new cond::DBSession(connect);
+  cond::DBSession* session=new cond::DBSession(true);
   session->sessionConfiguration().setAuthenticationMethod( cond::Env );
   if(debug){
     session->sessionConfiguration().setMessageLevel( cond::Debug );
@@ -83,15 +83,15 @@ int main( int argc, char** argv ){
   ::putenv(const_cast<char*>(passenv.c_str()));
   if( deleteAll ){
     try{
-      session->open(true);
-      cond::PoolStorageManager& pooldb=session->poolStorageManager(catalog);
+      session->open();
+      cond::PoolStorageManager pooldb(connect,catalog,session);
       cond::IOVService iovservice(pooldb);
       pooldb.connect();
       pooldb.startTransaction(false);
       iovservice.deleteAll();
       pooldb.commit();
       pooldb.disconnect();
-      cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+      cond::RelationalStorageManager coraldb(connect,session);
       cond::MetaData metadata_svc(coraldb);
       coraldb.connect(cond::ReadWrite);
       coraldb.startTransaction(false);
@@ -109,8 +109,8 @@ int main( int argc, char** argv ){
     }
   }else{
     try{
-      session->open(true);
-      cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+      session->open();
+      cond::RelationalStorageManager coraldb(connect,session);
       cond::MetaData metadata_svc(coraldb);
       coraldb.connect(cond::ReadOnly);
       coraldb.startTransaction(true);
@@ -121,7 +121,7 @@ int main( int argc, char** argv ){
       }
       coraldb.commit();
       coraldb.disconnect();
-      cond::PoolStorageManager& pooldb=session->poolStorageManager(catalog);
+      cond::PoolStorageManager pooldb(connect,catalog,session);
       cond::IOVService iovservice(pooldb);
       cond::IOVEditor* ioveditor=iovservice.newIOVEditor(token);
       pooldb.connect();

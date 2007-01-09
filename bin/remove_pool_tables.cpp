@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
     debug=true;
   }
   try{
-    cond::DBSession* session=new cond::DBSession(connect);
+    cond::DBSession* session=new cond::DBSession(true);
     session->sessionConfiguration().setAuthenticationMethod( cond::Env );
     if(debug){
       session->sessionConfiguration().setMessageLevel( cond::Debug );
@@ -77,8 +77,8 @@ int main(int argc, char** argv) {
     std::string passenv(std::string("CORAL_AUTH_PASSWORD=")+pass);
     ::putenv(const_cast<char*>(userenv.c_str()));
     ::putenv(const_cast<char*>(passenv.c_str()));
-    session->open(true);
-    cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+    session->open();
+    cond::RelationalStorageManager coraldb(connect);
     coraldb.connect(cond::ReadWriteCreate);
     coraldb.startTransaction(false);
     if( coraldb.sessionProxy().nominalSchema().existsTable("POOL_OR_MAPPING_VERSIONS") ) {

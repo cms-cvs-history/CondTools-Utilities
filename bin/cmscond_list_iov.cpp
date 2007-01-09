@@ -68,7 +68,7 @@ int main( int argc, char** argv ){
   if(vm.count("debug")){
     debug=true;
   }
-  cond::DBSession* session=new cond::DBSession(connect);
+  cond::DBSession* session=new cond::DBSession(true);
   session->sessionConfiguration().setAuthenticationMethod( cond::Env );
   if(debug){
     session->sessionConfiguration().setMessageLevel( cond::Debug );
@@ -84,8 +84,8 @@ int main( int argc, char** argv ){
   ::putenv(const_cast<char*>(passenv.c_str()));
   if( listAll ){
     try{
-      session->open(true);
-      cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+      session->open();
+      cond::RelationalStorageManager coraldb(connect,session);
       cond::MetaData metadata_svc(coraldb);
       std::vector<std::string> alltags;
       coraldb.connect(cond::ReadOnly);
@@ -108,8 +108,8 @@ int main( int argc, char** argv ){
     }
   }else{
     try{
-      session->open(true);
-      cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+      session->open();
+      cond::RelationalStorageManager coraldb(connect,session);
       cond::MetaData metadata_svc(coraldb);
       std::string token;
       coraldb.connect(cond::ReadOnly);
@@ -117,7 +117,7 @@ int main( int argc, char** argv ){
       token=metadata_svc.getToken(tag);
       coraldb.commit();
       coraldb.disconnect();
-      cond::PoolStorageManager& pooldb=session->poolStorageManager(catalog);
+      cond::PoolStorageManager pooldb(connect,catalog,session);
       cond::IOVService iovservice(pooldb);
       cond::IOVIterator* ioviterator=iovservice.newIOVIterator(token);
       pooldb.connect();

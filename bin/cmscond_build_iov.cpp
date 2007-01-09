@@ -170,7 +170,7 @@ int main(int argc, char** argv) {
   }
   ///end of command parsing
   try{
-    cond::DBSession* session=new cond::DBSession(connect);
+    cond::DBSession* session=new cond::DBSession(true);
     session->sessionConfiguration().setAuthenticationMethod( cond::Env );
     if(debug){
       session->sessionConfiguration().setMessageLevel( cond::Debug );
@@ -184,8 +184,7 @@ int main(int argc, char** argv) {
     std::string passenv(std::string("CORAL_AUTH_PASSWORD=")+pass);
     ::putenv(const_cast<char*>(userenv.c_str()));
     ::putenv(const_cast<char*>(passenv.c_str()));
-
-    session->open(true);
+    session->open();
     std::auto_ptr<pool::IFileCatalog> mycatalog(new pool::IFileCatalog);
     mycatalog->addReadCatalog(catalogname);
     pool::FClookup l;
@@ -204,7 +203,7 @@ int main(int argc, char** argv) {
     }
     mycatalog->commit();  
     mycatalog->disconnect();
-    cond::RelationalStorageManager& coraldb=session->relationalStorageManager();
+    cond::RelationalStorageManager coraldb(connect,session);
     cond::MetaData meta(coraldb);
     std::string iovtoken("");
     if( appendiov ){
@@ -277,7 +276,7 @@ int main(int argc, char** argv) {
     coraldb.disconnect();
 
     //writing iov out
-    cond::PoolStorageManager& pooldb=session->poolStorageManager(catalogname);
+    cond::PoolStorageManager pooldb(connect,catalogname,session);
     cond::IOVService iovservice(pooldb);
     cond::IOVEditor* iovEditor=iovservice.newIOVEditor(iovtoken);
     pooldb.connect();
