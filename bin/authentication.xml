@@ -1,9 +1,0 @@
-<?xml version="1.0" ?>
-<connectionlist>
-
-<connection name="oracle://devdb10/CMS_COND_GENERAL">
-  <parameter name="user" value="CMS_COND_GENERAL" />
-  <parameter name="password" value="place-holder" />
-</connection>
-
-</connectionlist>

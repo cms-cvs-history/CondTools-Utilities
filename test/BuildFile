@@ -1,3 +1,0 @@
-<use name=CondTools/Utilities>
-<bin file=testCSVLineParsers.cpp></bin>
-<bin file=testCSVFieldMap.cpp></bin>
