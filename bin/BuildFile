@@ -8,4 +8,5 @@
 <bin file=remove_mapping.cpp name=remove_mapping></bin>
 <bin file=cmscond_list_iov.cpp name=cmscond_list_iov></bin>
 <bin file=cmscond_build_iov.cpp name=cmscond_build_iov></bin>
-<bin file=cmscond_delete_iov.cpp name=cmscond_delete_iov></bin>
+<bin file=cmscond_export_iov.cpp name=cmscond_export_iov></bin>
+
