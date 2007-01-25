@@ -9,10 +9,13 @@
 #include "CondCore/MetaDataService/interface/MetaData.h"
 #include "CondCore/IOVService/interface/IOVService.h"
 #include "CondCore/IOVService/interface/IOVIterator.h"
+#include "CondCore/IOVService/interface/IOVEditor.h"
+#include "CondCore/MetaDataService/interface/MetaData.h"
 #include <boost/program_options.hpp>
 #include <iterator>
 #include <iostream>
 #include <fstream>
+#include <stdexcept>
 int main( int argc, char** argv ){
   boost::program_options::options_description desc("options");
   boost::program_options::options_description visible("Usage: cmscond_export_iov [options] \n");
@@ -124,6 +127,62 @@ int main( int argc, char** argv ){
     std::cout<<"tag:\t"<<tag<<'\n';
     std::cout<<"authPath:\t"<<authPath<<'\n';
     std::cout<<"configFile:\t"<<configuration_filename<<std::endl;
+  }
+  //
+  try{
+    cond::DBSession* session=new cond::DBSession(true);
+    if(!debug){
+      session->sessionConfiguration().setMessageLevel(cond::Error);
+    }else{
+      session->sessionConfiguration().setMessageLevel(cond::Debug);
+    }
+    session->open();
+    std::string sourceiovtoken;
+    std::string destiovtoken;
+
+    cond::RelationalStorageManager* sourceCoralDB=new cond::RelationalStorageManager(sourceConnect);
+    cond::MetaData* sourceMetadata=new cond::MetaData(*sourceCoralDB);
+    if( !sourceMetadata->hasTag(tag) ){
+      throw std::runtime_error(std::string("tag ")+tag+std::string(" not found") );
+    }
+    sourceiovtoken=sourceMetadata->getToken(tag);
+    if(debug){
+      std::cout<<"source iov token "<<sourceiovtoken<<std::endl;
+    }
+    delete sourceMetadata;
+    delete sourceCoralDB;
+
+    cond::PoolStorageManager sourcedb(sourceConnect,inputCatalog,session);
+    sourcedb.connect();
+    cond::IOVService iovmanager(sourcedb);
+    cond::IOVEditor* editor=iovmanager.newIOVEditor();
+    cond::PoolStorageManager destdb(destConnect,outputCatalog,session);
+    destdb.connect();
+    sourcedb.startTransaction(true);
+    destdb.startTransaction(false);
+    destiovtoken=iovmanager.exportIOVWithPayload( destdb,
+						  sourceiovtoken,
+						  payloadName );
+    sourcedb.commit();
+    destdb.commit();
+    sourcedb.disconnect();
+    destdb.disconnect();
+
+    cond::RelationalStorageManager* destCoralDB=new cond::RelationalStorageManager(destConnect);
+    cond::MetaData* destMetadata=new cond::MetaData(*destCoralDB);
+    destMetadata->addMapping(tag,destiovtoken);
+    if(debug){
+      std::cout<<"source iov token "<<sourceiovtoken<<std::endl;
+    }
+    delete destMetadata;
+    delete destCoralDB;
+    session->close();
+    delete editor;
+    delete session;
+  }catch(const cond::Exception& er){
+    std::cout<<"error "<<er.what()<<std::endl;
+  }catch(const std::exception& er){
+    std::cout<<"std error "<<er.what()<<std::endl;
   }
   return 0;
 }
