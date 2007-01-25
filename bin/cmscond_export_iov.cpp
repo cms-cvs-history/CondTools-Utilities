@@ -11,6 +11,9 @@
 #include "CondCore/IOVService/interface/IOVIterator.h"
 #include "CondCore/IOVService/interface/IOVEditor.h"
 #include "CondCore/MetaDataService/interface/MetaData.h"
+#include "CondCore/DBCommon/interface/ConnectMode.h"
+#include "SealBase/SharedLibrary.h"
+#include "SealBase/SharedLibraryError.h"
 #include <boost/program_options.hpp>
 #include <iterator>
 #include <iostream>
@@ -117,18 +120,24 @@ int main( int argc, char** argv ){
     std::cerr << er.what()<<std::endl;
     return 1;
   }
+  std::string dictlibrary=seal::SharedLibrary::libname( dictionary );
   if(debug){
     std::cout<<"sourceConnect:\t"<<sourceConnect<<'\n';
     std::cout<<"inputCatalog:\t"<<inputCatalog<<'\n';
     std::cout<<"destConnect:\t"<<destConnect<<'\n';
     std::cout<<"outputCatalog:\t"<<outputCatalog<<'\n';
-    std::cout<<"dictionary:\t"<<dictionary<<'\n';
+    std::cout<<"dictionary:\t"<<dictlibrary<<'\n';
     std::cout<<"payloadName:\t"<<payloadName<<'\n';
     std::cout<<"tag:\t"<<tag<<'\n';
     std::cout<<"authPath:\t"<<authPath<<'\n';
     std::cout<<"configFile:\t"<<configuration_filename<<std::endl;
   }
   //
+  try {
+    seal::SharedLibrary::load( dictlibrary );
+  }catch ( seal::SharedLibraryError *error) {
+    throw std::runtime_error( error->explainSelf().c_str() );
+  }
   try{
     cond::DBSession* session=new cond::DBSession(true);
     if(!debug){
@@ -141,11 +150,15 @@ int main( int argc, char** argv ){
     std::string destiovtoken;
 
     cond::RelationalStorageManager* sourceCoralDB=new cond::RelationalStorageManager(sourceConnect);
+    sourceCoralDB->connect(cond::ReadOnly);
+    sourceCoralDB->startTransaction(true);
     cond::MetaData* sourceMetadata=new cond::MetaData(*sourceCoralDB);
     if( !sourceMetadata->hasTag(tag) ){
       throw std::runtime_error(std::string("tag ")+tag+std::string(" not found") );
     }
     sourceiovtoken=sourceMetadata->getToken(tag);
+    sourceCoralDB->commit();
+    sourceCoralDB->disconnect();
     if(debug){
       std::cout<<"source iov token "<<sourceiovtoken<<std::endl;
     }
@@ -170,10 +183,14 @@ int main( int argc, char** argv ){
 
     cond::RelationalStorageManager* destCoralDB=new cond::RelationalStorageManager(destConnect);
     cond::MetaData* destMetadata=new cond::MetaData(*destCoralDB);
+    destCoralDB->connect(cond::ReadWriteCreate);
+    destCoralDB->startTransaction(false);
     destMetadata->addMapping(tag,destiovtoken);
     if(debug){
       std::cout<<"source iov token "<<sourceiovtoken<<std::endl;
     }
+    destCoralDB->commit();
+    destCoralDB->disconnect();
     delete destMetadata;
     delete destCoralDB;
     session->close();
