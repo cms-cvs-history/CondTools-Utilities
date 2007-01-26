@@ -32,6 +32,7 @@ int main( int argc, char** argv ){
     ("payloadName,n",boost::program_options::value<std::string>(),"payload object name(required)")
     ("authPath,p",boost::program_options::value<std::string>(),"path to authentication xml(default .)")
     ("configFile,f",boost::program_options::value<std::string>(),"configuration file(optional)")
+    ("withBlob","with blob streaming capability")
     ("debug","switch on debug mode")
     ("help,h", "help message")
     ;
@@ -44,6 +45,7 @@ int main( int argc, char** argv ){
   std::string authPath(".");
   std::string configuration_filename;
   bool debug=false;
+  bool withBlob=false;
   boost::program_options::variables_map vm;
   try{
     boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).run(), vm);
@@ -115,6 +117,9 @@ int main( int argc, char** argv ){
     if(vm.count("debug")){
       debug=true;
     }
+    if(vm.count("withBlob")){
+      withBlob=true;
+    }
     boost::program_options::notify(vm);
   }catch(const boost::program_options::error& er) {
     std::cerr << er.what()<<std::endl;
@@ -130,6 +135,7 @@ int main( int argc, char** argv ){
     std::cout<<"payloadName:\t"<<payloadName<<'\n';
     std::cout<<"tag:\t"<<tag<<'\n';
     std::cout<<"authPath:\t"<<authPath<<'\n';
+    if(withBlob) std::cout<<"with Blob streamer"<<authPath<<'\n';
     std::cout<<"configFile:\t"<<configuration_filename<<std::endl;
   }
   //
@@ -145,10 +151,11 @@ int main( int argc, char** argv ){
     }else{
       session->sessionConfiguration().setMessageLevel(cond::Debug);
     }
+    session->sessionConfiguration().setBlobStreamer("");
     session->open();
     std::string sourceiovtoken;
     std::string destiovtoken;
-
+    
     cond::RelationalStorageManager* sourceCoralDB=new cond::RelationalStorageManager(sourceConnect);
     sourceCoralDB->connect(cond::ReadOnly);
     sourceCoralDB->startTransaction(true);
