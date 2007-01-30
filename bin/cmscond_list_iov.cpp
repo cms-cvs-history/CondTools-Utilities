@@ -126,9 +126,9 @@ int main( int argc, char** argv ){
       std::string payloadContainer=iovservice.payloadContainerName(token);
       std::cout<<"Tag "<<tag<<"\n";
       std::cout<<"PayloadContainerName "<<payloadContainer<<"\n";
-      std::cout<<"since \t till"<<std::endl;
+      std::cout<<"since \t till \t payloadToken"<<std::endl;
       while( ioviterator->next() ){
-	std::cout<<ioviterator->validity().first<<" \t "<<ioviterator->validity().second<<std::endl;	
+	std::cout<<ioviterator->validity().first<<" \t "<<ioviterator->validity().second<<" \t "<<ioviterator->payloadToken()<<std::endl;	
 	++counter;
       }
       std::cout<<"Total # of payload objects: "<<counter<<std::endl;
