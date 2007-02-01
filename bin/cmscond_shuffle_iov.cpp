@@ -10,13 +10,16 @@
 #include "CondCore/IOVService/interface/IOVService.h"
 #include "CondCore/IOVService/interface/IOVIterator.h"
 #include "CondCore/IOVService/interface/IOVEditor.h"
-#include "CondTools/Utilities/interface/CSVDataLineParser.h"
+//#include "CondTools/Utilities/interface/CSVDataLineParser.h"
 #include "CondTools/Utilities/interface/CSVHeaderLineParser.h"
 #include "CondTools/Utilities/interface/CSVBlankLineParser.h"
 #include <boost/program_options.hpp>
+#include <boost/spirit/core.hpp>
+#include <boost/spirit/utility/lists.hpp>
 #include <iterator>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 void parseInputFile(std::fstream& inputFile,
 		    std::vector< std::pair<cond::Time_t, std::string> >& newValues){
   /*for(cond::Time_t i=1; i<100; ++i){
@@ -26,7 +29,6 @@ void parseInputFile(std::fstream& inputFile,
   unsigned int counter=0;
   std::vector<std::string> fieldNames;
   CSVHeaderLineParser headerParser;
-  CSVDataLineParser dataParser;
   unsigned int tillidx=0; //default
   unsigned int tokenidx=1;//default
   while (! inputFile.eof() ){
@@ -36,7 +38,6 @@ void parseInputFile(std::fstream& inputFile,
     if(blank.isBlank(line)){
       continue;
     }
-    std::cout<<1<<std::endl;
     if(counter==0) {
       if(!headerParser.parse(line)) {
 	throw cms::Exception("unable to parse header: ")<<line;
@@ -53,23 +54,32 @@ void parseInputFile(std::fstream& inputFile,
 	}
       }
     }else{
-      if(!dataParser.parse(line)) {
-	throw cms::Exception("unable to parse data :")<<line;
-      }
-      std::vector<boost::any> result=dataParser.result();
+      using namespace boost::spirit;
+      std::vector<std::string> result;
+      boost::spirit::rule<> strlist_parser;
+      strlist_parser=list_p((*anychar_p)[push_back_a(result)],',');
+      parse_info<> status=boost::spirit::parse(line.c_str(),strlist_parser);
+      if(!status.full) throw cms::Exception("unable to parse data: ")<<line;
       unsigned int idx=0;
       cond::Time_t till=0;
       std::string payloadToken;
-      for(std::vector<boost::any>::iterator it=result.begin(); 
+      for(std::vector<std::string>::iterator it=result.begin(); 
 	  it!=result.end(); ++it, ++idx){
-	std::cout<<idx<<std::endl;
+	//std::cout<<idx<<std::endl;
 	if( idx==tillidx ){
-	  till=(cond::Time_t)boost::any_cast<int>(*it);
+	  //std::cout<<"is till "<<*it<<std::endl;
+	  std::istringstream iss(*it);
+	  if((iss>>std::dec>>till).fail()){
+	    throw cms::Exception("string conversion failed");
+	  }
 	}
 	if( idx==tokenidx ){
-	  payloadToken=boost::any_cast<std::string>(*it);
+	  //std::cout<<"is token"<<std::endl;
+	  payloadToken=*it;
 	}
       }
+      //std::cout<<"till "<<till<<std::endl;
+      //std::cout<<"token "<<payloadToken<<std::endl;
       newValues.push_back(std::make_pair<cond::Time_t, std::string>(till,payloadToken));
     }
     ++counter;
