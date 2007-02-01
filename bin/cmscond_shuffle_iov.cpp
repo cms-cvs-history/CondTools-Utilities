@@ -10,14 +10,70 @@
 #include "CondCore/IOVService/interface/IOVService.h"
 #include "CondCore/IOVService/interface/IOVIterator.h"
 #include "CondCore/IOVService/interface/IOVEditor.h"
+#include "CondTools/Utilities/interface/CSVDataLineParser.h"
+#include "CondTools/Utilities/interface/CSVHeaderLineParser.h"
+#include "CondTools/Utilities/interface/CSVBlankLineParser.h"
 #include <boost/program_options.hpp>
 #include <iterator>
 #include <iostream>
 #include <fstream>
 void parseInputFile(std::fstream& inputFile,
 		    std::vector< std::pair<cond::Time_t, std::string> >& newValues){
-  for(cond::Time_t i=1; i<100; ++i){
+  /*for(cond::Time_t i=1; i<100; ++i){
     newValues.push_back(std::make_pair<cond::Time_t, std::string>(i,"token"));
+    }
+  */
+  unsigned int counter=0;
+  std::vector<std::string> fieldNames;
+  CSVHeaderLineParser headerParser;
+  CSVDataLineParser dataParser;
+  unsigned int tillidx=0; //default
+  unsigned int tokenidx=1;//default
+  while (! inputFile.eof() ){
+    std::string line;
+    std::getline (inputFile,line);
+     CSVBlankLineParser blank;
+    if(blank.isBlank(line)){
+      continue;
+    }
+    std::cout<<1<<std::endl;
+    if(counter==0) {
+      if(!headerParser.parse(line)) {
+	throw cms::Exception("unable to parse header: ")<<line;
+      }
+      fieldNames=headerParser.result();
+      unsigned int idx=0;
+      for(std::vector<std::string>::iterator it=fieldNames.begin();
+	  it!=fieldNames.end(); ++it, ++idx){
+	if( *it==std::string("TILL") || *it==std::string("till") ){
+	  tillidx=idx;
+	}
+	if( *it==std::string("TOKEN") || *it==std::string("token") ){
+	  tokenidx=idx;
+	}
+      }
+    }else{
+      if(!dataParser.parse(line)) {
+	throw cms::Exception("unable to parse data :")<<line;
+      }
+      std::vector<boost::any> result=dataParser.result();
+      unsigned int idx=0;
+      cond::Time_t till=0;
+      std::string payloadToken;
+      for(std::vector<boost::any>::iterator it=result.begin(); 
+	  it!=result.end(); ++it, ++idx){
+	std::cout<<idx<<std::endl;
+	if( idx==tillidx ){
+	  till=(cond::Time_t)boost::any_cast<int>(*it);
+	}
+	if( idx==tokenidx ){
+	  payloadToken=boost::any_cast<std::string>(*it);
+	}
+      }
+      newValues.push_back(std::make_pair<cond::Time_t, std::string>(till,payloadToken));
+    }
+    ++counter;
+    continue;
   }
 }
 
@@ -71,6 +127,7 @@ int main( int argc, char** argv ){
     inputFileName=vm["inputFile"].as<std::string>();
     inputFile.open(inputFileName.c_str(), std::fstream::in);
     parseInputFile(inputFile,newValues);
+    inputFile.close();
   }
   if(!vm.count("connect")){
     std::cerr <<"[Error] no connect[c] option given \n";
