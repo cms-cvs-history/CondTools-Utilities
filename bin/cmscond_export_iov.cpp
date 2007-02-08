@@ -19,6 +19,7 @@
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
+#include <cstdlib>
 int main( int argc, char** argv ){
   boost::program_options::options_description desc("options");
   boost::program_options::options_description visible("Usage: cmscond_export_iov [options] \n");
@@ -144,19 +145,22 @@ int main( int argc, char** argv ){
   }catch ( seal::SharedLibraryError *error) {
     throw std::runtime_error( error->explainSelf().c_str() );
   }
+  cond::DBSession* session=new cond::DBSession(true);
+  if(!debug){
+    session->sessionConfiguration().setMessageLevel(cond::Error);
+  }else{
+    session->sessionConfiguration().setMessageLevel(cond::Debug);
+  }
+  session->sessionConfiguration().setAuthenticationMethod(cond::XML);
+  session->sessionConfiguration().setBlobStreamer("");
+  std::string pathval("CORAL_AUTH_PATH=");
+  pathval+=authPath;
+  ::putenv(const_cast<char*>(pathval.c_str()));
+  session->open();
   try{
-    cond::DBSession* session=new cond::DBSession(true);
-    if(!debug){
-      session->sessionConfiguration().setMessageLevel(cond::Error);
-    }else{
-      session->sessionConfiguration().setMessageLevel(cond::Debug);
-    }
-    session->sessionConfiguration().setBlobStreamer("");
-    session->open();
     std::string sourceiovtoken;
     std::string destiovtoken;
-    
-    cond::RelationalStorageManager* sourceCoralDB=new cond::RelationalStorageManager(sourceConnect);
+    cond::RelationalStorageManager* sourceCoralDB=new cond::RelationalStorageManager(sourceConnect,session);
     sourceCoralDB->connect(cond::ReadOnly);
     sourceCoralDB->startTransaction(true);
     cond::MetaData* sourceMetadata=new cond::MetaData(*sourceCoralDB);
@@ -171,7 +175,6 @@ int main( int argc, char** argv ){
     }
     delete sourceMetadata;
     delete sourceCoralDB;
-
     cond::PoolStorageManager sourcedb(sourceConnect,inputCatalog,session);
     sourcedb.connect();
     cond::IOVService iovmanager(sourcedb);
@@ -187,8 +190,7 @@ int main( int argc, char** argv ){
     destdb.commit();
     sourcedb.disconnect();
     destdb.disconnect();
-
-    cond::RelationalStorageManager* destCoralDB=new cond::RelationalStorageManager(destConnect);
+    cond::RelationalStorageManager* destCoralDB=new cond::RelationalStorageManager(destConnect,session);
     cond::MetaData* destMetadata=new cond::MetaData(*destCoralDB);
     destCoralDB->connect(cond::ReadWriteCreate);
     destCoralDB->startTransaction(false);
