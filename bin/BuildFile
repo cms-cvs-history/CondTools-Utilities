@@ -12,4 +12,5 @@
 <bin file=cmscond_shuffle_iov.cpp name=cmscond_shuffle_iov>
    <use name=CondTools/Utilities>		
 </bin>
+<bin file=cmscond_delete_iov.cpp name=cmscond_delete_iov></bin>
 
